@@ -35,6 +35,6 @@ for f in 01_schema.sql 02_views.sql 03_procedures.sql 05_seed_data.sql; do
 done
 
 echo "Running 04_security.sql"
-run -d "$DB_NAME" -i "$DIR/04_security.sql" -v AppPassword="$APP_PASSWORD" ReaderPassword="$READER_PASSWORD"
+run -d "$DB_NAME" -i "$DIR/04_security.sql" -v AppPassword="$APP_PASSWORD" -v ReaderPassword="$READER_PASSWORD"
 
 echo "Done."

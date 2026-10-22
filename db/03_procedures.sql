@@ -34,21 +34,24 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    WITH bal AS (
-        SELECT * FROM dbo.fn_StudentTermBalance(@AsOfDate)
-    )
+    -- evaluate the balance function once instead of once per KPI
+    SELECT StudentId, Balance, PastDueAmount, Due90Plus, VaStatus
+    INTO #bal
+    FROM dbo.fn_StudentTermBalance(@AsOfDate);
+
     SELECT
-        (SELECT ISNULL(SUM(Balance), 0) FROM bal WHERE Balance > 0)                                AS TotalReceivable,
-        (SELECT ISNULL(SUM(PastDueAmount), 0) FROM bal)                                            AS PastDueAmount,
-        (SELECT ISNULL(SUM(Due90Plus), 0) FROM bal)                                                AS PastDue90Plus,
-        (SELECT COUNT(DISTINCT StudentId) FROM bal WHERE PastDueAmount > 0)                        AS StudentsPastDue,
-        (SELECT ISNULL(SUM(PastDueAmount), 0) FROM bal WHERE VaStatus = 'PENDING')                 AS PastDueWithVaPending,
+        ISNULL(SUM(CASE WHEN Balance > 0 THEN Balance END), 0)                  AS TotalReceivable,
+        ISNULL(SUM(PastDueAmount), 0)                                           AS PastDueAmount,
+        ISNULL(SUM(Due90Plus), 0)                                               AS PastDue90Plus,
+        COUNT(DISTINCT CASE WHEN PastDueAmount > 0 THEN StudentId END)          AS StudentsPastDue,
+        ISNULL(SUM(CASE WHEN VaStatus = 'PENDING' THEN PastDueAmount END), 0)   AS PastDueWithVaPending,
         (SELECT ISNULL(-SUM(at.Amount), 0)
            FROM dbo.AccountTransaction at
            JOIN dbo.DetailCode dc ON dc.DetailCode = at.DetailCode
           WHERE dc.Category IN ('PAY', 'AID')
             AND at.EffectiveDate >  DATEADD(DAY, -30, @AsOfDate)
-            AND at.EffectiveDate <= @AsOfDate)                                                     AS CollectedLast30Days;
+            AND at.EffectiveDate <= @AsOfDate)                                  AS CollectedLast30Days
+    FROM #bal;
 END
 GO
 
