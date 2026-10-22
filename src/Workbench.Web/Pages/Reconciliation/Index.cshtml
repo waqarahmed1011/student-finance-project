@@ -1,0 +1,98 @@
+@page
+@model Workbench.Web.Pages.Reconciliation.IndexModel
+@{
+    ViewData["Title"] = "Vendor Reconciliation";
+}
+
+<h1 class="page-title">Vendor Payment Reconciliation</h1>
+<p class="page-subtitle">
+    Upload the settlement file from the payment plan vendor (fictional "ClearPath Tuition Plans") and compare it to what was
+    actually posted to student accounts. Nothing is posted automatically. Differences go to an exception queue where someone
+    reviews and resolves each one, and every step is written to the audit log.
+</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6">Run a reconciliation</h2>
+
+                @if (Model.Error is not null)
+                {
+                    <div class="alert alert-danger py-2">@Model.Error</div>
+                }
+                <div asp-validation-summary="All" class="text-danger small"></div>
+
+                <form method="post" enctype="multipart/form-data">
+                    <div class="mb-2">
+                        <label asp-for="UploadedBy" class="form-label small mb-1"></label>
+                        <input asp-for="UploadedBy" class="form-control form-control-sm" placeholder="e.g. Jordan in Student Finance" style="max-width: 22rem" />
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+                        <button type="submit" asp-page-handler="Sample" class="btn btn-primary">Run the sample vendor file</button>
+                        <a class="btn btn-link" href="~/samples/@Workbench.Web.Pages.Reconciliation.IndexModel.SampleFileName" download>Download the sample file</a>
+                    </div>
+
+                    <div class="border-top pt-3">
+                        <label asp-for="Upload" class="form-label small mb-1">Or upload your own file (.csv, max 2 MB)</label>
+                        <div class="d-flex gap-2" style="max-width: 32rem">
+                            <input asp-for="Upload" type="file" accept=".csv" class="form-control form-control-sm" />
+                            <button type="submit" asp-page-handler="Upload" class="btn btn-sm btn-outline-primary">Upload</button>
+                        </div>
+                        <div class="form-text">Columns: vendor_txn_id, student_id, payment_date, amount, payment_method, plan_id</div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-body small">
+                <h2 class="h6">What it checks</h2>
+                <ul class="mb-0 ps-3">
+                    <li><strong>Missing in ledger</strong>: vendor collected it, we never posted it (student looks past due but paid)</li>
+                    <li><strong>Amount mismatch</strong>: posted amount doesn't match what the vendor settled</li>
+                    <li><strong>Wrong student</strong>: payment posted to someone else's account</li>
+                    <li><strong>Not in vendor file</strong>: we posted a vendor payment the vendor didn't settle</li>
+                    <li><strong>Duplicate in file</strong>, <strong>unknown student ID</strong>, <strong>invalid row</strong>: problems on the vendor's side</li>
+                </ul>
+                <p class="mt-2 mb-0 text-muted">The sample file has a few of each planted in it on purpose.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h2 class="h6 mb-3">Recent reconciliations</h2>
+        @if (Model.Batches.Count == 0)
+        {
+            <p class="text-muted mb-0">None yet. Run the sample file above.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover table-tight mb-0">
+                    <thead><tr><th>Batch</th><th>File</th><th>Run by</th><th>When (UTC)</th><th class="num">Rows</th><th class="num">Amount</th><th class="num">Matched</th><th class="num">Exceptions</th><th class="num">Still open</th></tr></thead>
+                    <tbody>
+                    @foreach (var b in Model.Batches)
+                    {
+                        <tr>
+                            <td><a asp-page="Batch" asp-route-id="@b.BatchId">#@b.BatchId</a></td>
+                            <td>@b.FileName</td>
+                            <td>@b.UploadedBy</td>
+                            <td>@b.UploadedAt.ToString("MM/dd/yyyy HH:mm")</td>
+                            <td class="num">@b.TotalRows</td>
+                            <td class="num">@b.TotalAmount.ToString("C2")</td>
+                            <td class="num">@b.MatchedRows</td>
+                            <td class="num">@b.ExceptionRows</td>
+                            <td class="num">@if (b.OpenExceptions > 0) { <span class="badge bg-warning text-dark">@b.OpenExceptions</span> } else { <span class="text-success">0</span> }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

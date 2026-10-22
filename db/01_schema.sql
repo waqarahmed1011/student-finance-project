@@ -116,13 +116,13 @@ CREATE TABLE dbo.ReconBatch (
 CREATE TABLE dbo.ReconException (
     ExceptionId     INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     BatchId         INT           NOT NULL REFERENCES dbo.ReconBatch (BatchId),
-    LineNumber      INT           NOT NULL,
+    LineNumber      INT           NULL,      -- NULL for ledger-side findings (NotInVendorFile)
     VendorTxnId     VARCHAR(40)   NULL,
     StudentId       VARCHAR(20)   NULL,
     PaymentDate     DATE          NULL,
     FileAmount      DECIMAL(12,2) NULL,
     LedgerAmount    DECIMAL(12,2) NULL,
-    ExceptionType   VARCHAR(30)   NOT NULL,  -- MissingInLedger, AmountMismatch, StudentMismatch, DuplicateInFile, UnknownStudent, InvalidRow
+    ExceptionType   VARCHAR(30)   NOT NULL,  -- see ReconExceptionType in Workbench.Core
     Detail          NVARCHAR(400) NOT NULL,
     Status          VARCHAR(10)   NOT NULL DEFAULT 'OPEN',  -- OPEN, RESOLVED
     ResolvedBy      NVARCHAR(60)  NULL,

@@ -10,6 +10,7 @@ withdrawals with Return of Title IV adjustments, and so on.
 Output:
     db/05_seed_data.sql
     samples/clearpath_settlement_2026-10-01_2026-10-09.csv   (vendor file with planted exceptions)
+    src/Workbench.Web/wwwroot/samples/...                    (same file, served by the web app)
 
 Run:  python3 tools/generate_seed_data.py
 Deterministic (fixed random seed), so re-running gives the same data.
@@ -26,6 +27,7 @@ random.seed(20261026)
 ROOT = Path(__file__).resolve().parent.parent
 SEED_SQL = ROOT / "db" / "05_seed_data.sql"
 VENDOR_CSV = ROOT / "samples" / "clearpath_settlement_2026-10-01_2026-10-09.csv"
+VENDOR_CSV_WEB_COPY = ROOT / "src" / "Workbench.Web" / "wwwroot" / "samples" / VENDOR_CSV.name  # served by the web app
 
 DATA_CUTOFF = date(2026, 10, 21)  # nothing gets posted after this date
 STUDENT_COUNT = 2500
@@ -218,17 +220,20 @@ def simulate_term(s: Student, term, is_first_term: bool):
 
     expected_credits = 0.0
     titleiv = []
+    va_pending = False
 
     # --- VA ---
     if s.va_chapter:
         certified = start - timedelta(days=random.randint(5, 20))
         cap = 14960.0
         expected = (tuition + fees) if s.va_chapter == "31" else min(tuition + fees, cap) * s.va_pct
-        paid_on = certified + timedelta(days=random.randint(24, 62))
+        # VA is slower at fall peak, so a chunk of Fall 2026 is still waiting
+        paid_on = certified + timedelta(days=random.randint(35, 85) if code == "202630" else random.randint(24, 62))
         # a few certifications stuck at VA well past the 90-day protection window
-        if code == "202620" and random.random() < 0.18:
+        if code == "202620" and random.random() < 0.07:
             paid_on = date(2027, 1, 15)
         status = "PAID" if paid_on <= DATA_CUTOFF else "PENDING"
+        va_pending = status == "PENDING"
         va_certs.append((sid, code, s.va_chapter, certified, money(expected), status, paid_on if status == "PAID" else None))
         add(Txn(sid, code, "VA" + s.va_chapter, -expected, paid_on))
         expected_credits += expected
@@ -308,7 +313,10 @@ def simulate_term(s: Student, term, is_first_term: bool):
             add(Txn(sid, code, "CARD", -owed * random.choice([1, 0.5]), withdraw_date + timedelta(days=random.randint(40, 90))))
         return
 
-    behavior = random.choices(["card", "plan", "late", "delinquent"], weights=[58, 30, 7, 5])[0]
+    weights = [58, 30, 7, 5]
+    if va_pending and s.va_pct < 1:
+        weights = [40, 10, 25, 25]  # partial-eligibility students often hold off paying their share until VA pays
+    behavior = random.choices(["card", "plan", "late", "delinquent"], weights=weights)[0]
     if behavior == "card":
         if random.random() < 0.3:
             add(Txn(sid, code, "CARD", -owed / 2, due - timedelta(days=random.randint(1, 10))))
@@ -419,6 +427,8 @@ def plant_vendor_file_exceptions(students):
                                           "payment_method", "plan_id"])
         w.writeheader()
         w.writerows(file_rows)
+    VENDOR_CSV_WEB_COPY.parent.mkdir(parents=True, exist_ok=True)
+    VENDOR_CSV_WEB_COPY.write_bytes(VENDOR_CSV.read_bytes())
     return len(file_rows)
 
 

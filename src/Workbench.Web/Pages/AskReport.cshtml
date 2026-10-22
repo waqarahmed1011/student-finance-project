@@ -1,0 +1,142 @@
+@page
+@model AskReportModel
+@{
+    ViewData["Title"] = "Ask for a Report";
+}
+
+<h1 class="page-title">Ask for a Report</h1>
+<p class="page-subtitle">
+    Type the request the way a manager would ask for it. AI (Google Gemini) drafts the SQL, you look it over, and only then does it run.
+    The AI never sees student data, only the definitions of the reporting views. The query runs under a read-only database login
+    that can only see those views, and the views leave out names and emails.
+</p>
+
+@if (!Model.AiConfigured)
+{
+    <div class="alert alert-secondary py-2 small">
+        AI isn't switched on for this deployment (no API key). You can still write and run a query against the rpt views below.
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-5">
+        <div class="card mb-3">
+            <div class="card-body">
+                <form method="post" id="askForm">
+                    <label for="Question" class="form-label fw-semibold small">1. What do you need?</label>
+                    <textarea asp-for="Question" class="form-control mb-2" rows="3" maxlength="500"
+                              placeholder="e.g. Students at Lakeshore with a past-due balance over $1,000 in Fall 2026"></textarea>
+                    <div class="d-flex flex-wrap gap-1 mb-3">
+                        @foreach (var example in AskReportModel.Examples)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary example-btn">@example</button>
+                        }
+                    </div>
+                    <button type="submit" asp-page-handler="Generate" class="btn btn-primary" disabled="@(!Model.AiConfigured)">Draft the SQL</button>
+
+                    <hr />
+
+                    <label for="Sql" class="form-label fw-semibold small">2. Review the SQL (you can edit it)</label>
+                    @if (Model.Explanation is not null)
+                    {
+                        <div class="rule-callout small mb-2">@Model.Explanation</div>
+                    }
+                    <textarea asp-for="Sql" class="form-control sql-box mb-2" rows="10" spellcheck="false"
+                              placeholder="SELECT TOP (50) StudentId, ProgramName, PastDueAmount FROM rpt.StudentBalances WHERE PastDueAmount > 0 ORDER BY PastDueAmount DESC"></textarea>
+
+                    @if (Model.Check is not null)
+                    {
+                        if (Model.Check.IsAllowed)
+                        {
+                            <div class="small text-success mb-2">&#10003; Passed the safety check: single SELECT, reporting views only.</div>
+                        }
+                        else
+                        {
+                            <div class="small text-danger mb-2">&#10007; Blocked: @Model.Check.Reason</div>
+                        }
+                    }
+
+                    <button type="submit" asp-page-handler="Run" class="btn btn-success">3. Run it</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body small">
+                <h2 class="h6">Guardrails</h2>
+                <ol class="ps-3 mb-0">
+                    <li>The model gets the view definitions only. No rows, no names.</li>
+                    <li>A person reviews the SQL before it runs. Nothing runs automatically.</li>
+                    <li>Microsoft's T-SQL parser checks it: one SELECT, only <code>rpt.*</code> views, no SELECT INTO, OPENROWSET or functions.</li>
+                    <li>It runs as <code>report_reader</code>, a login with SELECT on the rpt schema and nothing else.</li>
+                    <li>500-row cap, 15-second timeout, and the question plus SQL go to the audit log.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-7">
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-danger py-2">@Model.Error</div>
+        }
+
+        @if (Model.Result is not null)
+        {
+            <div class="card">
+                <div class="card-body pb-0">
+                    <h2 class="h6">
+                        Results
+                        <span class="text-muted fw-normal small">@Model.Result.Rows.Count rows@(Model.Result.Truncated ? $" (capped at {ReportQueryRunner.MaxRows})" : "")</span>
+                    </h2>
+                </div>
+                <div class="table-responsive" style="max-height: 70vh">
+                    <table class="table table-sm table-hover table-tight mb-0">
+                        <thead class="sticky-top"><tr>@foreach (var c in Model.Result.Columns) { <th>@c</th> }</tr></thead>
+                        <tbody>
+                        @foreach (var row in Model.Result.Rows)
+                        {
+                            <tr>
+                                @foreach (var v in row)
+                                {
+                                    @switch (v)
+                                    {
+                                        case decimal d: <td class="num">@d.ToString("N2")</td>; break;
+                                        case int or long: <td class="num">@v</td>; break;
+                                        case DateTime dt: <td>@dt.ToString("MM/dd/yyyy")</td>; break;
+                                        case null: <td class="text-muted">NULL</td>; break;
+                                        default: <td>@v</td>; break;
+                                    }
+                                }
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-body small">
+                    <h2 class="h6">Views you can ask about</h2>
+                    <dl class="mb-0">
+                        <dt><code>rpt.StudentBalances</code></dt><dd>One row per student per term: charges, payments, aid, balance, past-due amount, aging bucket, VA and payment plan status.</dd>
+                        <dt><code>rpt.Payments</code></dt><dd>Every payment and aid disbursement with its fund source (Title IV, VA, military TA, self-pay, payment plan, employer, scholarship).</dd>
+                        <dt><code>rpt.Students</code></dt><dd>Institution, program, award level, enrollment status, military affiliation.</dd>
+                        <dt><code>rpt.VaCertifications</code></dt><dd>VA Chapter 33/31 certifications, expected amount, pending or paid.</dd>
+                        <dt><code>rpt.PaymentPlans</code></dt><dd>Third-party payment plan enrollments and status.</dd>
+                    </dl>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.example-btn').forEach(b => b.addEventListener('click', () => {
+            document.getElementById('Question').value = b.textContent.trim();
+        }));
+    </script>
+}

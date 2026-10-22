@@ -1,10 +1,137 @@
 ﻿@page
 @model IndexModel
+@using System.Text.Json
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Dashboard";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<h1 class="page-title">Tuition Payment Dashboard</h1>
+<p class="page-subtitle">
+    Receivables and payment trends across all five institutions as of @Model.AsOf.ToString("MMMM d, yyyy").
+    Everything here comes from the same balance function the Past-Due Report uses, so the numbers always tie out.
+</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Total receivable</div>
+            <div class="kpi-value">@Model.Kpis.TotalReceivable.ToString("C0")</div>
+            <div class="kpi-note">all positive balances</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Past due</div>
+            <div class="kpi-value text-danger">@Model.Kpis.PastDueAmount.ToString("C0")</div>
+            <div class="kpi-note">@Model.Kpis.StudentsPastDue.ToString("N0") students</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Over 90 days</div>
+            <div class="kpi-value">@Model.Kpis.PastDue90Plus.ToString("C0")</div>
+            <div class="kpi-note">@(Model.Kpis.PastDueAmount == 0 ? "0" : (Model.Kpis.PastDue90Plus / Model.Kpis.PastDueAmount).ToString("P0")) of past due</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Waiting on VA</div>
+            <div class="kpi-value">@Model.Kpis.PastDueWithVaPending.ToString("C0")</div>
+            <div class="kpi-note">past due with VA payment pending</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Collected, last 30 days</div>
+            <div class="kpi-value text-success">@Model.Kpis.CollectedLast30Days.ToString("C0")</div>
+            <div class="kpi-note">payments + aid</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2 d-flex">
+        <a asp-page="/PastDue" class="btn btn-outline-primary w-100 align-self-stretch d-flex align-items-center justify-content-center">
+            Open Past-Due Report &rarr;
+        </a>
+    </div>
 </div>
+
+<div class="row g-3 mb-4">
+    <div class="col-xl-7">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h6 mb-3">Money received by month and source</h2>
+            <div class="chart-box"><canvas id="trendChart" aria-label="Payments by month and fund source"></canvas></div>
+        </div></div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h6 mb-3">Past due by institution and age</h2>
+            <div class="chart-box"><canvas id="agingChart" aria-label="Past due by institution and aging bucket"></canvas></div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h2 class="h6 mb-3">Collection rate by term</h2>
+        <table class="table table-sm table-tight mb-0">
+            <thead>
+                <tr><th>Term</th><th class="num">Net charges</th><th class="num">Collected (payments + aid)</th><th class="num">Collection rate</th><th style="width:35%"></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var t in Model.CollectionRates)
+            {
+                <tr>
+                    <td>@t.TermDescription <span class="text-muted">(@t.TermCode)</span></td>
+                    <td class="num">@t.NetCharges.ToString("C0")</td>
+                    <td class="num">@t.Collected.ToString("C0")</td>
+                    <td class="num fw-semibold">@t.CollectionRate.ToString("P1")</td>
+                    <td>
+                        <div class="progress" role="progressbar" aria-valuenow="@((int)(t.CollectionRate * 100))" aria-valuemin="0" aria-valuemax="100" style="height: .6rem">
+                            <div class="progress-bar" style="width: @((t.CollectionRate * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chart.js/chart.umd.js"></script>
+    <script>
+        const trend = @Html.Raw(JsonSerializer.Serialize(Model.PaymentTrendChart));
+        const aging = @Html.Raw(JsonSerializer.Serialize(Model.AgingChart));
+        const money = v => '$' + Math.round(v).toLocaleString('en-US');
+        const moneyShort = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + Math.round(v / 1e3) + 'K' : '$' + v;
+
+        const sourceColors = {
+            'Title IV aid': '#1f3a5f', 'VA benefits': '#2e7d32', 'Military TA': '#558b2f',
+            'Student self-pay': '#f9a825', 'Payment plan (vendor)': '#ef6c00', 'Employer': '#6a1b9a', 'Scholarship': '#00838f'
+        };
+        trend.datasets.forEach(d => d.backgroundColor = sourceColors[d.label] || '#90a4ae');
+
+        new Chart(document.getElementById('trendChart'), {
+            type: 'bar',
+            data: trend,
+            options: {
+                maintainAspectRatio: false,
+                scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: moneyShort } } },
+                plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } }
+            }
+        });
+
+        const bucketColors = ['#ffcc80', '#ffa726', '#ef6c00', '#b71c1c'];
+        aging.datasets.forEach((d, i) => d.backgroundColor = bucketColors[i]);
+
+        new Chart(document.getElementById('agingChart'), {
+            type: 'bar',
+            data: aging,
+            options: {
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: { x: { stacked: true, ticks: { callback: moneyShort } }, y: { stacked: true } },
+                plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.x)}` } } }
+            }
+        });
+    </script>
+}

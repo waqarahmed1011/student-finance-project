@@ -1,22 +1,131 @@
-html {
-  font-size: 14px;
-}
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+:root {
+    --app-navy: #1f3a5f;
+    --app-navy-dark: #172c48;
+    --app-bg: #f5f7fa;
+    --app-border: #dfe4ea;
 }
 
 html {
-  position: relative;
-  min-height: 100%;
+    font-size: 15px;
 }
 
 body {
-  margin-bottom: 60px;
+    background: var(--app-bg);
+    color: #1d2733;
+}
+
+.app-nav {
+    background: var(--app-navy);
+}
+
+.app-nav .nav-link {
+    color: rgba(255, 255, 255, .8);
+}
+
+.app-nav .nav-link:hover,
+.app-nav .nav-link:focus {
+    color: #fff;
+}
+
+.demo-banner {
+    background: #fff8e1;
+    border-bottom: 1px solid #f0dfa8;
+    color: #6b5400;
+    font-size: .85rem;
+    padding: .35rem 1.5rem;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: .25rem;
+}
+
+.page-subtitle {
+    color: #5b6775;
+    margin-bottom: 1.25rem;
+    max-width: 70rem;
+}
+
+.card {
+    border-color: var(--app-border);
+    border-radius: .5rem;
+}
+
+.kpi-card .kpi-label {
+    color: #5b6775;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.kpi-card .kpi-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.kpi-card .kpi-note {
+    color: #6c7884;
+    font-size: .8rem;
+}
+
+.action-card {
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.action-card:hover .card {
+    border-color: var(--app-navy);
+}
+
+.action-card.active .card {
+    border-color: var(--app-navy);
+    box-shadow: 0 0 0 2px rgba(31, 58, 95, .25);
+}
+
+.table-tight td,
+.table-tight th {
+    padding: .4rem .55rem;
+    font-size: .875rem;
+    vertical-align: middle;
+}
+
+.table thead th {
+    color: #4a5562;
+    font-weight: 600;
+    white-space: nowrap;
+    background: #eef1f5;
+}
+
+.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.reason {
+    color: #4a5562;
+    font-size: .8rem;
+    max-width: 28rem;
+}
+
+.chart-box {
+    position: relative;
+    height: 300px;
+}
+
+.sql-box {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .85rem;
+    min-height: 10rem;
+}
+
+.rule-callout {
+    border-left: 4px solid var(--app-navy);
+    background: #fff;
+    padding: .75rem 1rem;
+    border-radius: .25rem;
 }

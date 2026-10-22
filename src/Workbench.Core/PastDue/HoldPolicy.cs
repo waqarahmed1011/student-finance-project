@@ -19,7 +19,8 @@ public sealed record HoldPolicyInput(
     string? VaStatus,
     DateOnly? VaCertifiedDate,
     decimal? VaExpectedAmount,
-    string? PaymentPlanStatus);
+    string? PaymentPlanStatus,
+    bool CurrentlyEnrolled = true);
 
 public sealed record HoldDecision(
     AccountAction Action,
@@ -105,6 +106,9 @@ public sealed class HoldPolicy
                 string.Create(Us, $"Under the {_options.MinimumHoldBalance:C} hold threshold. Reminder only."));
         }
 
-        return new HoldDecision(AccountAction.HoldEligible, 0, pastDue, "Eligible for registration hold and outreach.");
+        return new HoldDecision(AccountAction.HoldEligible, 0, pastDue,
+            input.CurrentlyEnrolled
+                ? "Eligible for registration hold and outreach."
+                : "No longer enrolled. Eligible for outreach and collections review.");
     }
 }

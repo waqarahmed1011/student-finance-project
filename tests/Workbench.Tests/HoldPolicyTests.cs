@@ -27,6 +27,14 @@ public class HoldPolicyTests
     }
 
     [Fact]
+    public void Former_student_is_routed_to_collections_review_not_a_registration_hold()
+    {
+        var result = _policy.Evaluate(Input(1500m) with { CurrentlyEnrolled = false }, AsOf);
+        Assert.Equal(AccountAction.HoldEligible, result.Action);
+        Assert.Contains("collections", result.Reason);
+    }
+
+    [Fact]
     public void Small_balance_under_threshold_gets_reminder_only()
     {
         var result = _policy.Evaluate(Input(150m), AsOf);
