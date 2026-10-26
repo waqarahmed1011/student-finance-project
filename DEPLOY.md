@@ -101,13 +101,11 @@ az webapp config connection-string set --name $APP_NAME --resource-group $RG --c
 
 (`Connect Timeout=90` gives the paused database time to wake up instead of erroring.)
 
-Add the GitHub link shown on the "How it works" page:
+Add your Gemini key (see "Getting a Gemini API key" below) and the GitHub link. The key lives only in Azure, never in the code:
 
 ```bash
-az webapp config appsettings set --name $APP_NAME --resource-group $RG --settings Links__SourceCode='https://github.com/waqarahmed1011/student-finance-project'
+az webapp config appsettings set --name $APP_NAME --resource-group $RG --settings Gemini__ApiKey='PASTE-YOUR-KEY-HERE' Links__SourceCode='https://github.com/waqarahmed1011/student-finance-project'
 ```
-
-The Gemini key is already in `src/Workbench.Web/appsettings.json`. To swap in a different key without changing code, add `Gemini__ApiKey='...'` to the command above.
 
 ## 4. Deploy the code
 
@@ -134,7 +132,7 @@ To deploy again after code changes, rerun the three commands in this step.
 2. Accept the terms if asked, then click **Create API key**.
 3. If it asks for a project, pick **Create API key in new project** (or any existing project).
 4. Copy the key (starts with `AIza`). Treat it like a password: don't commit it to GitHub or paste it into chats or emails.
-5. This project already has a key in `src/Workbench.Web/appsettings.json` (it has a usage limit set in Google AI Studio). To use a different one, replace it there, or set `Gemini__ApiKey` as an app setting in step 3.
+5. Use it in the `Gemini__ApiKey` command in step 3. For running locally, add `"Gemini": { "ApiKey": "..." }` to `src/Workbench.Web/appsettings.Development.json` (that file is git-ignored, so the key never reaches GitHub).
 
 The app tries several Gemini models in order (`Gemini:Models` in appsettings.json) because Google retires models and returns "high demand" errors at busy times.
 
