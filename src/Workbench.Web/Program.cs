@@ -27,7 +27,7 @@ builder.Services.AddScoped<AuditRepository>();
 builder.Services.AddScoped<PastDueService>();
 builder.Services.AddScoped<ReportQueryRunner>();
 builder.Services.AddScoped<ReconciliationService>();
-builder.Services.AddHttpClient<IReportSqlGenerator, GeminiSqlGenerator>(c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient<IReportSqlGenerator, GeminiSqlGenerator>(c => c.Timeout = TimeSpan.FromSeconds(70));
 
 // Azure App Service sits behind a proxy; this makes RemoteIpAddress the visitor's IP for the rate limiter
 builder.Services.Configure<ForwardedHeadersOptions>(o =>

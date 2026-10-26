@@ -79,7 +79,7 @@ Load the schema and data:
 SQL_SERVER=localhost SQL_ADMIN_USER=sa SQL_ADMIN_PASSWORD='Dev!Passw0rd123' APP_PASSWORD='App!Passw0rd123' READER_PASSWORD='Read!Passw0rd123' bash tools/setup-database.sh
 ```
 
-Create the local settings file (already has the passwords above; add a Gemini key inside it if you have one):
+Create the local settings file (already has the passwords above):
 
 ```bash
 cp src/Workbench.Web/appsettings.Development.example.json src/Workbench.Web/appsettings.Development.json

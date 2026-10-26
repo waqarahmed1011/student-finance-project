@@ -8,7 +8,9 @@ namespace Workbench.Web.Services;
 public sealed class GeminiOptions
 {
     public string? ApiKey { get; set; }
-    public string Model { get; set; } = "gemini-2.5-flash";
+
+    /// <summary>Tried in order. Google retires and rate-limits models often, so the next one is the fallback.</summary>
+    public string[] Models { get; set; } = [];
 }
 
 public sealed record GeneratedSql(string Sql, string Explanation);
@@ -60,6 +62,8 @@ public sealed class GeminiSqlGenerator : IReportSqlGenerator
         CSM Coral Sound School of Medicine, CVM Coral Sound School of Veterinary Medicine, HIA Heartland Institute of Allied Health.
         """;
 
+    private static readonly string[] DefaultModels = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _http;
@@ -99,32 +103,68 @@ public sealed class GeminiSqlGenerator : IReportSqlGenerator
         {
             systemInstruction = new { parts = new[] { new { text = systemPrompt } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = question } } } },
-            generationConfig = new { temperature = 0.1, responseMimeType = "application/json" }
+            generationConfig = new
+            {
+                temperature = 0.1,
+                responseMimeType = "application/json",
+                thinkingConfig = new { thinkingLevel = "low" } // fast answers; this is a simple task
+            }
         };
 
-        using var message = new HttpRequestMessage(HttpMethod.Post,
-            $"https://generativelanguage.googleapis.com/v1beta/models/{_options.Model}:generateContent")
-        {
-            Content = JsonContent.Create(request)
-        };
-        message.Headers.Add("x-goog-api-key", _options.ApiKey);
+        var models = _options.Models is { Length: > 0 } ? _options.Models : DefaultModels;
+        var failures = new List<string>();
 
-        using var response = await _http.SendAsync(message, ct);
-        if (!response.IsSuccessStatusCode)
+        // two passes: Google's 503 "high demand" errors usually clear within a couple of seconds
+        for (var pass = 0; pass < 2; pass++)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
-            throw new HttpRequestException($"Gemini returned {(int)response.StatusCode}: {body[..Math.Min(body.Length, 300)]}");
+            foreach (var model in models)
+            {
+                if (pass > 0 && model == models[0])
+                    await Task.Delay(TimeSpan.FromSeconds(2), ct);
+
+                using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                attemptTimeout.CancelAfter(TimeSpan.FromSeconds(20));
+
+                using var message = new HttpRequestMessage(HttpMethod.Post,
+                    $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent")
+                {
+                    Content = JsonContent.Create(request)
+                };
+                message.Headers.Add("x-goog-api-key", _options.ApiKey);
+
+                try
+                {
+                    using var response = await _http.SendAsync(message, attemptTimeout.Token);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        // 404 retired model, 429 quota, 503 overloaded: try the next model
+                        failures.Add($"{model}: {(int)response.StatusCode}");
+                        continue;
+                    }
+
+                    var payload = await response.Content.ReadFromJsonAsync<GeminiResponse>(JsonOptions, attemptTimeout.Token);
+                    var text = string.Concat(payload?.Candidates?.FirstOrDefault()?.Content?.Parts?
+                        .Where(p => p.Thought != true)
+                        .Select(p => p.Text) ?? []);
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        failures.Add($"{model}: empty response");
+                        continue;
+                    }
+
+                    var answer = JsonSerializer.Deserialize<ModelAnswer>(text, JsonOptions)
+                        ?? throw new InvalidOperationException("Couldn't read Gemini's answer.");
+
+                    return new GeneratedSql(answer.Sql?.Trim() ?? "", answer.Explanation?.Trim() ?? "");
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    failures.Add($"{model}: timed out");
+                }
+            }
         }
 
-        var payload = await response.Content.ReadFromJsonAsync<GeminiResponse>(JsonOptions, ct);
-        var text = payload?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
-        if (string.IsNullOrWhiteSpace(text))
-            throw new InvalidOperationException("Gemini returned an empty response.");
-
-        var answer = JsonSerializer.Deserialize<ModelAnswer>(text, JsonOptions)
-            ?? throw new InvalidOperationException("Couldn't read Gemini's answer.");
-
-        return new GeneratedSql(answer.Sql?.Trim() ?? "", answer.Explanation?.Trim() ?? "");
+        throw new HttpRequestException($"No Gemini model answered ({string.Join(", ", failures)}).");
     }
 
     private sealed record ModelAnswer(string? Sql, string? Explanation);
@@ -132,5 +172,7 @@ public sealed class GeminiSqlGenerator : IReportSqlGenerator
     private sealed record GeminiResponse(List<Candidate>? Candidates);
     private sealed record Candidate(Content? Content);
     private sealed record Content(List<Part>? Parts);
-    private sealed record Part([property: JsonPropertyName("text")] string? Text);
+    private sealed record Part(
+        [property: JsonPropertyName("text")] string? Text,
+        [property: JsonPropertyName("thought")] bool? Thought);
 }
