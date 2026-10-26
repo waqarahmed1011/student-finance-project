@@ -49,26 +49,55 @@ samples/                vendor settlement file with planted exceptions
 docs/                   requirements, UAT plan, data dictionary
 ```
 
-## Run it locally
+## Run it locally (Mac)
 
-Needs Docker and the .NET 8 SDK. On an Apple Silicon Mac, turn on "Use Rosetta for x86/amd64 emulation" in Docker Desktop settings for the SQL Server image.
+### One-time installs
+
+1. **Docker Desktop**: https://www.docker.com/products/docker-desktop/ . Open it once. On an Apple Silicon Mac, go to Settings > General and turn on "Use Rosetta for x86_64/amd64 emulation".
+2. **.NET 8 SDK**: the macOS installer from https://dotnet.microsoft.com/download/dotnet/8.0 (Arm64 for Apple Silicon, x64 for Intel). It has to be 8; a newer SDK alone won't run this app.
+3. **sqlcmd**: `brew install sqlcmd`
+4. **Get the code** (then stay in this folder for everything below):
 
 ```bash
-# 1. SQL Server in Docker
+git clone -b claude/serene-bohr-omzu20 https://github.com/waqarahmed1011/student-finance-project.git
+cd student-finance-project
+```
+
+### Start it
+
+Paste each block one at a time.
+
+Start SQL Server, then wait about 30 seconds:
+
+```bash
 docker run -d --name sfw-sql -e ACCEPT_EULA=Y -e 'MSSQL_SA_PASSWORD=Dev!Passw0rd123' -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+```
 
-# 2. Load schema and data (brew install sqlcmd)
-SQL_SERVER=localhost SQL_ADMIN_USER=sa SQL_ADMIN_PASSWORD='Dev!Passw0rd123' \
-APP_PASSWORD='App!Passw0rd123' READER_PASSWORD='Read!Passw0rd123' ./tools/setup-database.sh
+Load the schema and data:
 
-# 3. Connection strings
+```bash
+SQL_SERVER=localhost SQL_ADMIN_USER=sa SQL_ADMIN_PASSWORD='Dev!Passw0rd123' APP_PASSWORD='App!Passw0rd123' READER_PASSWORD='Read!Passw0rd123' bash tools/setup-database.sh
+```
+
+Create the local settings file (already has the passwords above; add a Gemini key inside it if you have one):
+
+```bash
 cp src/Workbench.Web/appsettings.Development.example.json src/Workbench.Web/appsettings.Development.json
-# edit the two passwords to match step 2, optionally add a Gemini API key
+```
 
-# 4. Run
+Run the app and open the http://localhost address it prints:
+
+```bash
 dotnet run --project src/Workbench.Web
+```
+
+Run the tests (in a second terminal tab, same folder):
+
+```bash
 dotnet test
 ```
+
+Next time: open Docker Desktop, run `docker start sfw-sql`, then `dotnet run --project src/Workbench.Web`.
 
 To regenerate the data: `python3 tools/generate_seed_data.py` (deterministic, fixed seed).
 
