@@ -1,0 +1,178 @@
+@page
+@model PastDueModel
+@{
+    ViewData["Title"] = "Past-Due Report";
+    var all = Model.AllLines;
+    var lines = Model.FilteredLines;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div>
+        <h1 class="page-title">Past-Due Report</h1>
+        <p class="page-subtitle">
+            Students with a past-due balance as of @Model.EffectiveAsOf.ToString("MM/dd/yyyy"), aged by each charge's due date.
+            Every row is run through the hold rules, so students protected under 38 U.S.C. 3679(e) or on an active payment plan
+            don't end up on a hold or late-fee list.
+        </p>
+    </div>
+    <a class="btn btn-primary" asp-page-handler="Export" asp-all-route-data="Model.RouteWith()">Export CSV (@lines.Count.ToString("N0") rows)</a>
+</div>
+
+<form method="get" class="card mb-3">
+    <div class="card-body row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-1" for="asOf">As of</label>
+            <input class="form-control form-control-sm" type="date" id="asOf" name="asOf" value="@Model.EffectiveAsOf.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small mb-1" for="institutionId">Institution</label>
+            <select class="form-select form-select-sm" id="institutionId" name="institutionId">
+                <option value="">All institutions</option>
+                @foreach (var i in Model.Institutions)
+                {
+                    <option value="@i.Value" selected="@(i.Value == Model.InstitutionId?.ToString())">@i.Text</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-1" for="termCode">Term</label>
+            <select class="form-select form-select-sm" id="termCode" name="termCode">
+                <option value="">All terms</option>
+                @foreach (var t in Model.Terms)
+                {
+                    <option value="@t.Value" selected="@(t.Value == Model.TermCode)">@t.Text</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-1" for="bucket">Oldest past due</label>
+            <select class="form-select form-select-sm" id="bucket" name="bucket">
+                <option value="">Any age</option>
+                @foreach (var b in PastDueModel.BucketOptions)
+                {
+                    <option value="@b" selected="@(b == Model.Bucket)">@b days</option>
+                }
+            </select>
+        </div>
+        @if (Model.Action is not null)
+        {
+            <input type="hidden" name="status" value="@Model.Action" />
+        }
+        <div class="col-12 col-md-3 d-flex gap-2">
+            <button class="btn btn-sm btn-primary" type="submit">Apply</button>
+            <a class="btn btn-sm btn-outline-secondary" asp-page="/PastDue">Reset</a>
+        </div>
+    </div>
+</form>
+
+<div class="row g-2 mb-3">
+    @foreach (var action in PastDueModel.ActionOrder)
+    {
+        var group = all.Where(l => l.Decision.Action == action).ToList();
+        var isActive = Model.Action == action;
+        <div class="col-6 col-md-4 col-xl-2">
+            <a class="action-card @(isActive ? "active" : "")"
+               asp-page="/PastDue" asp-all-route-data="@(isActive ? Model.RouteWith(clearAction: true) : Model.RouteWith(action))">
+                <div class="card h-100"><div class="card-body py-2">
+                    <span class="badge @PastDueService.BadgeClass(action)">@PastDueService.Label(action)</span>
+                    <div class="fw-semibold mt-1">@group.Count.ToString("N0") <span class="text-muted fw-normal small">rows</span></div>
+                    <div class="small text-muted">@group.Sum(l => l.Row.PastDueAmount).ToString("C0") past due</div>
+                </div></div>
+            </a>
+        </div>
+    }
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <table class="table table-sm table-tight mb-0">
+            <thead>
+                <tr>
+                    <th>Aging (@(Model.Action is null ? "all rows" : PastDueService.Label(Model.Action.Value)))</th>
+                    <th class="num">Not yet due</th><th class="num">1-30</th><th class="num">31-60</th>
+                    <th class="num">61-90</th><th class="num">90+</th><th class="num">Total past due</th>
+                    <th class="num">Hold-eligible</th><th class="num">VA protected</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="fw-semibold">
+                    <td>Totals</td>
+                    <td class="num">@lines.Sum(l => l.Row.NotYetDue).ToString("C0")</td>
+                    <td class="num">@lines.Sum(l => l.Row.Due1To30).ToString("C0")</td>
+                    <td class="num">@lines.Sum(l => l.Row.Due31To60).ToString("C0")</td>
+                    <td class="num">@lines.Sum(l => l.Row.Due61To90).ToString("C0")</td>
+                    <td class="num">@lines.Sum(l => l.Row.Due90Plus).ToString("C0")</td>
+                    <td class="num text-danger">@lines.Sum(l => l.Row.PastDueAmount).ToString("C0")</td>
+                    <td class="num">@lines.Sum(l => l.Decision.HoldEligibleAmount).ToString("C0")</td>
+                    <td class="num text-success">@lines.Sum(l => l.Decision.ProtectedAmount).ToString("C0")</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover table-tight mb-0">
+            <thead>
+                <tr>
+                    <th>Student</th><th>Institution / program</th><th>Term</th>
+                    <th class="num">Balance</th><th class="num">Past due</th><th class="num">Days</th>
+                    <th>Funding</th><th>Recommended action</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (Model.PageLines.Count == 0)
+            {
+                <tr><td colspan="8" class="text-center text-muted py-4">No past-due balances match these filters.</td></tr>
+            }
+            @foreach (var line in Model.PageLines)
+            {
+                var r = line.Row;
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@r.LastName, @r.FirstName</div>
+                        <div class="small text-muted">@r.StudentId @(r.EnrollmentStatus != "Active" ? $"· {r.EnrollmentStatus}" : "")</div>
+                    </td>
+                    <td>
+                        <div>@r.InstitutionCode</div>
+                        <div class="small text-muted">@r.ProgramName</div>
+                    </td>
+                    <td>@r.TermDescription</td>
+                    <td class="num">@r.Balance.ToString("C2")</td>
+                    <td class="num fw-semibold">@r.PastDueAmount.ToString("C2")</td>
+                    <td class="num">@r.DaysPastDue</td>
+                    <td class="small">
+                        @if (r.VaChapter is not null)
+                        {
+                            <div>VA Ch. @r.VaChapter: @(r.VaStatus == "PENDING" ? $"pending since {r.VaCertifiedDate:MM/dd}" : "paid")</div>
+                        }
+                        @if (r.PaymentPlanStatus is not null)
+                        {
+                            <div>Plan: @r.PaymentPlanStatus.ToLowerInvariant()</div>
+                        }
+                        @if (r.MilitaryAffiliation == "ActiveDuty")
+                        {
+                            <div>Military TA</div>
+                        }
+                    </td>
+                    <td>
+                        <span class="badge @PastDueService.BadgeClass(line.Decision.Action)">@PastDueService.Label(line.Decision.Action)</span>
+                        <div class="reason mt-1">@line.Decision.Reason</div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.PageCount > 1)
+    {
+        <div class="card-footer d-flex justify-content-between align-items-center small">
+            <span>Page @Model.PageNumber of @Model.PageCount · @lines.Count.ToString("N0") rows</span>
+            <div class="btn-group btn-group-sm">
+                <a class="btn btn-outline-secondary @(Model.PageNumber <= 1 ? "disabled" : "")" asp-page="/PastDue" asp-all-route-data="Model.RouteWith(page: Model.PageNumber - 1)">Previous</a>
+                <a class="btn btn-outline-secondary @(Model.PageNumber >= Model.PageCount ? "disabled" : "")" asp-page="/PastDue" asp-all-route-data="Model.RouteWith(page: Model.PageNumber + 1)">Next</a>
+            </div>
+        </div>
+    }
+</div>

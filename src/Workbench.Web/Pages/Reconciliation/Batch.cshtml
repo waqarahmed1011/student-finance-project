@@ -1,0 +1,91 @@
+@page "{id:int}"
+@model Workbench.Web.Pages.Reconciliation.BatchModel
+@{
+    var b = Model.Batch!;
+    ViewData["Title"] = $"Reconciliation #{b.BatchId}";
+    var matchRate = b.TotalRows == 0 ? 0 : (decimal)b.MatchedRows / b.TotalRows;
+}
+
+<a asp-page="Index" class="small">&larr; All reconciliations</a>
+<h1 class="page-title mt-1">Reconciliation #@b.BatchId</h1>
+<p class="page-subtitle">@b.FileName · run by @b.UploadedBy on @b.UploadedAt.ToString("MM/dd/yyyy HH:mm") UTC · vendor: @b.VendorName</p>
+
+@if (Model.Message is not null)
+{
+    <div class="alert alert-info py-2">@Model.Message</div>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3"><div class="card kpi-card h-100"><div class="card-body">
+        <div class="kpi-label">Rows in file</div><div class="kpi-value">@b.TotalRows</div>
+        <div class="kpi-note">@b.TotalAmount.ToString("C2") settled</div>
+    </div></div></div>
+    <div class="col-6 col-lg-3"><div class="card kpi-card h-100"><div class="card-body">
+        <div class="kpi-label">Matched</div><div class="kpi-value text-success">@b.MatchedRows</div>
+        <div class="kpi-note">@matchRate.ToString("P1") match rate</div>
+    </div></div></div>
+    <div class="col-6 col-lg-3"><div class="card kpi-card h-100"><div class="card-body">
+        <div class="kpi-label">Exceptions</div><div class="kpi-value text-danger">@b.ExceptionRows</div>
+        <div class="kpi-note">need a person to review</div>
+    </div></div></div>
+    <div class="col-6 col-lg-3"><div class="card kpi-card h-100"><div class="card-body">
+        <div class="kpi-label">Still open</div><div class="kpi-value">@b.OpenExceptions</div>
+        <div class="kpi-note">@(b.ExceptionRows - b.OpenExceptions) resolved</div>
+    </div></div></div>
+</div>
+
+<div class="card">
+    <div class="card-body pb-0 d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0">Exception queue</h2>
+        <a class="small" asp-page="Batch" asp-route-id="@b.BatchId" asp-route-showResolved="@(!Model.ShowResolved)">
+            @(Model.ShowResolved ? "Show open only" : "Include resolved")
+        </a>
+    </div>
+    <div class="table-responsive mt-2">
+        <table class="table table-sm table-tight mb-0">
+            <thead>
+                <tr><th>Line</th><th>Type</th><th>Vendor txn</th><th>Student</th><th>Date</th><th class="num">File amt</th><th class="num">Ledger amt</th><th>What happened / next step</th><th style="min-width: 19rem">Resolve</th></tr>
+            </thead>
+            <tbody>
+            @if (Model.Exceptions.Count == 0)
+            {
+                <tr><td colspan="9" class="text-center text-muted py-4">No open exceptions. This file is fully reconciled.</td></tr>
+            }
+            @foreach (var e in Model.Exceptions)
+            {
+                <tr class="@(e.Status == "RESOLVED" ? "table-light text-muted" : "")">
+                    <td>@(e.LineNumber?.ToString() ?? "ledger")</td>
+                    <td><span class="badge @(e.Status == "RESOLVED" ? "bg-secondary" : "bg-warning text-dark")">@ReconciliationService.Label(e.ExceptionType)</span></td>
+                    <td class="small">@e.VendorTxnId</td>
+                    <td class="small">@e.StudentId</td>
+                    <td class="small">@e.PaymentDate?.ToString("MM/dd/yyyy")</td>
+                    <td class="num">@e.FileAmount?.ToString("C2")</td>
+                    <td class="num">@e.LedgerAmount?.ToString("C2")</td>
+                    <td class="reason">
+                        <div>@e.Detail</div>
+                        <div class="text-primary">@ReconciliationService.NextStep(e.ExceptionType)</div>
+                    </td>
+                    <td>
+                        @if (e.Status == "OPEN")
+                        {
+                            <form method="post" asp-page-handler="Resolve" asp-route-id="@b.BatchId" asp-route-showResolved="@Model.ShowResolved" class="d-flex flex-column gap-1">
+                                <input type="hidden" name="Resolve.ExceptionId" value="@e.ExceptionId" />
+                                <input name="Resolve.ResolvedBy" class="form-control form-control-sm" placeholder="Your name" maxlength="60" required />
+                                <div class="d-flex gap-1">
+                                    <input name="Resolve.Note" class="form-control form-control-sm" placeholder="What you did" maxlength="400" minlength="5" required />
+                                    <button class="btn btn-sm btn-outline-success" type="submit">Resolve</button>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="small">@e.ResolvedBy, @e.ResolvedAt?.ToString("MM/dd HH:mm")</div>
+                            <div class="small">@e.ResolutionNote</div>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

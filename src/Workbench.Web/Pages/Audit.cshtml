@@ -1,0 +1,35 @@
+@page
+@model AuditModel
+@{
+    ViewData["Title"] = "Audit Log";
+}
+
+<h1 class="page-title">Audit Log</h1>
+<p class="page-subtitle">
+    Every reconciliation, resolved exception, report export and AI-generated query gets a row here, written in the same
+    database transaction as the change itself. The table is insert-only for the app's login. Latest 200 shown.
+</p>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm table-tight mb-0">
+            <thead><tr><th>When (UTC)</th><th>Who</th><th>Action</th><th>Record</th><th>Details</th></tr></thead>
+            <tbody>
+            @if (Model.Entries.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-muted py-4">Nothing yet. Run a reconciliation or export the past-due report.</td></tr>
+            }
+            @foreach (var e in Model.Entries)
+            {
+                <tr>
+                    <td class="text-nowrap">@e.EventTime.ToString("MM/dd/yyyy HH:mm:ss")</td>
+                    <td>@e.Actor</td>
+                    <td><code>@e.Action</code></td>
+                    <td class="text-nowrap">@e.EntityType @e.EntityId</td>
+                    <td class="small" style="white-space: pre-wrap; max-width: 50rem">@e.Details</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

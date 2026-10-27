@@ -1,0 +1,175 @@
+@page
+@model MonthModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = Model.MonthLabel;
+    var filtered = Model.Filtered;
+}
+
+<a asp-page="/Index" class="small">&larr; Dashboard</a>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mt-1">
+    <div>
+        <h1 class="page-title">Money received: @Model.MonthLabel</h1>
+        <p class="page-subtitle mb-2">
+            Every payment and aid disbursement posted to student accounts this month (scholarships excluded, since they're a discount, not cash).
+            Click a source or school to filter the transaction list.
+        </p>
+    </div>
+    <div class="btn-group btn-group-sm">
+        <a class="btn btn-outline-secondary" asp-page="/Month" asp-route-m="@Model.PrevKey">&larr; @DateOnly.ParseExact(Model.PrevKey + "-01", "yyyy-MM-dd").ToString("MMM yyyy")</a>
+        @if (Model.HasNext)
+        {
+            <a class="btn btn-outline-secondary" asp-page="/Month" asp-route-m="@Model.NextKey">@DateOnly.ParseExact(Model.NextKey + "-01", "yyyy-MM-dd").ToString("MMM yyyy") &rarr;</a>
+        }
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Total received</div>
+            <div class="kpi-value text-success">@Model.Total.ToString("C0")</div>
+            <div class="kpi-note">@Model.Receipts.Count.ToString("N0") transactions, @Model.Receipts.Select(r => r.StudentId).Distinct().Count().ToString("N0") students</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Prior month (@DateOnly.ParseExact(Model.PrevKey + "-01", "yyyy-MM-dd").ToString("MMM yyyy"))</div>
+            <div class="kpi-value">@(Model.PriorMonth is { HasData: true } ? (Model.PriorMonth.Amount ?? 0).ToString("C0") : "n/a")</div>
+            <div class="kpi-note">@MonthModel.ChangeText(Model.Total, Model.PriorMonth)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Same month last year (@Model.MonthStart.AddYears(-1).ToString("MMM yyyy"))</div>
+            <div class="kpi-value">@(Model.PriorYear is { HasData: true } ? (Model.PriorYear.Amount ?? 0).ToString("C0") : "n/a")</div>
+            <div class="kpi-note">@MonthModel.ChangeText(Model.Total, Model.PriorYear)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Largest source</div>
+            <div class="kpi-value" style="font-size:1.25rem">@(Model.BySource.FirstOrDefault().Label ?? "n/a")</div>
+            <div class="kpi-note">@(Model.Total == 0 ? "" : (Model.BySource.First().Amount / Model.Total).ToString("P0") + " of the month")</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-xl-8">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h6 mb-3">Day by day</h2>
+            <div class="chart-box"><canvas id="dailyChart" aria-label="Receipts by day and fund source"></canvas></div>
+        </div></div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card mb-3"><div class="card-body">
+            <h2 class="h6 mb-2">By fund source</h2>
+            <table class="table table-sm table-tight mb-0">
+                <tbody>
+                @foreach (var s in Model.BySource)
+                {
+                    <tr class="@(Model.Source == s.Key ? "table-primary" : "")">
+                        <td><a asp-page="/Month" asp-all-route-data="@Model.RouteWith(source: s.Key)">@s.Label</a></td>
+                        <td class="num">@s.Amount.ToString("C0")</td>
+                        <td class="num text-muted">@(Model.Total == 0 ? "" : (s.Amount / Model.Total).ToString("P0"))</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div></div>
+        <div class="card"><div class="card-body">
+            <h2 class="h6 mb-2">By school</h2>
+            <table class="table table-sm table-tight mb-0">
+                <thead><tr><th>School</th><th class="num">Amount</th><th class="num">Students</th></tr></thead>
+                <tbody>
+                @foreach (var s in Model.BySchool)
+                {
+                    <tr class="@(Model.School == s.Key ? "table-primary" : "")">
+                        <td><a asp-page="/Month" asp-all-route-data="@Model.RouteWith(school: s.Key)">@s.Key</a></td>
+                        <td class="num">@s.Amount.ToString("C0")</td>
+                        <td class="num">@s.Students.ToString("N0")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body pb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h2 class="h6 mb-0">
+            Transactions
+            <span class="text-muted fw-normal small">
+                @filtered.Count.ToString("N0") rows, @filtered.Sum(r => r.Amount).ToString("C0")
+                @if (Model.Source is not null) { <span> · source: @IndexModel.FundSourceLabel(Model.Source)</span> }
+                @if (Model.School is not null) { <span> · school: @Model.School</span> }
+            </span>
+        </h2>
+        <div class="d-flex gap-2">
+            @if (Model.Source is not null || Model.School is not null)
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-page="/Month" asp-all-route-data="@Model.RouteWith(clear: true)">Clear filters</a>
+            }
+            <a class="btn btn-sm btn-primary" asp-page="/Month" asp-page-handler="Export" asp-all-route-data="@Model.RouteWith()">Export CSV</a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover table-tight mb-0">
+            <thead><tr><th>Date</th><th>Student</th><th>School</th><th>Term</th><th>Type</th><th>Source</th><th class="num">Amount</th></tr></thead>
+            <tbody>
+            @if (Model.PageRows.Count == 0)
+            {
+                <tr><td colspan="7" class="text-center text-muted py-4">No receipts in this month.</td></tr>
+            }
+            @foreach (var r in Model.PageRows)
+            {
+                <tr>
+                    <td>@r.EffectiveDate.ToString("MM/dd")</td>
+                    <td><div>@r.StudentName</div><div class="small text-muted">@r.StudentId</div></td>
+                    <td>@r.InstitutionCode</td>
+                    <td>@r.TermCode</td>
+                    <td>@r.Description @if (r.ExternalRef is not null) { <span class="small text-muted">(@r.ExternalRef)</span> }</td>
+                    <td>@IndexModel.FundSourceLabel(r.FundSource)</td>
+                    <td class="num">@r.Amount.ToString("C2")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.PageCount > 1)
+    {
+        <div class="card-footer d-flex justify-content-between align-items-center small">
+            <span>Largest first · page @Model.PageNumber of @Model.PageCount</span>
+            <div class="btn-group btn-group-sm">
+                <a class="btn btn-outline-secondary @(Model.PageNumber <= 1 ? "disabled" : "")" asp-page="/Month" asp-all-route-data="@Model.RouteWith(page: Model.PageNumber - 1)">Previous</a>
+                <a class="btn btn-outline-secondary @(Model.PageNumber >= Model.PageCount ? "disabled" : "")" asp-page="/Month" asp-all-route-data="@Model.RouteWith(page: Model.PageNumber + 1)">Next</a>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script src="~/lib/chart.js/chart.umd.js"></script>
+    <script>
+        const daily = @Html.Raw(JsonSerializer.Serialize(Model.DailyChart));
+        const money = v => '$' + Math.round(v).toLocaleString('en-US');
+        const moneyShort = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + Math.round(v / 1e3) + 'K' : '$' + v;
+        const sourceColors = {
+            'Title IV aid': '#1f3a5f', 'VA benefits': '#2e7d32', 'Military TA': '#558b2f',
+            'Student self-pay': '#f9a825', 'Payment plan (vendor)': '#ef6c00', 'Employer': '#6a1b9a'
+        };
+        daily.datasets.forEach(d => d.backgroundColor = sourceColors[d.label] || '#90a4ae');
+
+        new Chart(document.getElementById('dailyChart'), {
+            type: 'bar',
+            data: daily,
+            options: {
+                maintainAspectRatio: false,
+                scales: { x: { stacked: true, title: { display: true, text: 'Day of month' } }, y: { stacked: true, ticks: { callback: moneyShort } } },
+                plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } }
+            }
+        });
+    </script>
+}
