@@ -7,6 +7,7 @@
 #   SQL_SERVER=localhost SQL_ADMIN_USER=sa SQL_ADMIN_PASSWORD='...' ./tools/setup-database.sh
 # Azure SQL (database must already exist, script won't drop it):
 #   SQL_SERVER=yourserver.database.windows.net SQL_ADMIN_USER=... SQL_ADMIN_PASSWORD='...' AZURE=1 ./tools/setup-database.sh
+# Reload an Azure database that already has the tables: add RESET=1 (drops this project's objects first).
 #
 # APP_PASSWORD and READER_PASSWORD set the passwords for the two app logins.
 set -euo pipefail
@@ -27,6 +28,11 @@ run() {
 if [[ "${AZURE:-0}" != "1" ]]; then
     echo "Recreating database $DB_NAME"
     run -d master -Q "IF DB_ID('$DB_NAME') IS NOT NULL BEGIN ALTER DATABASE [$DB_NAME] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$DB_NAME]; END; CREATE DATABASE [$DB_NAME];"
+fi
+
+if [[ "${RESET:-0}" == "1" ]]; then
+    echo "Dropping existing objects"
+    run -d "$DB_NAME" -i "$DIR/00_reset.sql"
 fi
 
 for f in 01_schema.sql 02_views.sql 03_procedures.sql 05_seed_data.sql; do

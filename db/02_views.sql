@@ -12,6 +12,9 @@ RETURN
         Aging uses FIFO payment application: payments and aid pay off the oldest charges first,
         so whatever is still owed sits on the newest charges. Each unpaid slice is then aged by
         that charge's own due date. Same idea as a standard AR aging report.
+
+        Students on an active or completed payment plan are aged on the plan's installment schedule
+        instead, so someone paying on time isn't reported as past due on the original tuition date.
     */
     WITH Txn AS (
         SELECT at.TransactionId, at.StudentId, at.TermCode, at.Amount,
@@ -32,14 +35,41 @@ RETURN
         FROM Txn
         GROUP BY StudentId, TermCode
     ),
-    Debits AS (
-        -- running total of debits from newest to oldest
-        SELECT t.StudentId, t.TermCode, t.Amount, t.DueDate,
-               SUM(t.Amount) OVER (PARTITION BY t.StudentId, t.TermCode
-                                   ORDER BY t.DueDate DESC, t.TransactionId DESC
-                                   ROWS UNBOUNDED PRECEDING) AS NewerAndThis
+    PlanTerm AS (
+        SELECT pp.StudentId, pp.TermCode, pp.VendorPlanId, pp.PlanAmount
+        FROM dbo.PaymentPlan pp
+        WHERE pp.EnrolledDate <= @AsOfDate
+          AND pp.Status <> 'CANCELLED'   -- a cancelled plan falls back to the original due dates
+    ),
+    DebitItems AS (
+        -- no plan: every charge (and positive adjustment) with its own due date
+        SELECT t.StudentId, t.TermCode, t.Amount, t.DueDate, t.TransactionId AS SortKey
         FROM Txn t
         WHERE t.Amount > 0
+          AND NOT EXISTS (SELECT 1 FROM PlanTerm p WHERE p.StudentId = t.StudentId AND p.TermCode = t.TermCode)
+
+        UNION ALL
+        -- on a plan: the plan amount is due on the installment schedule
+        SELECT p.StudentId, p.TermCode, i.Amount, i.DueDate, i.InstallmentNo
+        FROM PlanTerm p
+        JOIN dbo.PaymentPlanInstallment i ON i.VendorPlanId = p.VendorPlanId
+
+        UNION ALL
+        -- on a plan: whatever the plan doesn't cover (the part aid or VA pays) is due on the term due date
+        SELECT p.StudentId, p.TermCode, d.Total - p.PlanAmount, tm.PaymentDueDate, 0
+        FROM PlanTerm p
+        JOIN dbo.Term tm ON tm.TermCode = p.TermCode
+        CROSS APPLY (SELECT SUM(t.Amount) AS Total FROM Txn t
+                     WHERE t.StudentId = p.StudentId AND t.TermCode = p.TermCode AND t.Amount > 0) d
+        WHERE d.Total > p.PlanAmount
+    ),
+    Debits AS (
+        -- running total of debits from newest to oldest
+        SELECT d.StudentId, d.TermCode, d.Amount, d.DueDate,
+               SUM(d.Amount) OVER (PARTITION BY d.StudentId, d.TermCode
+                                   ORDER BY d.DueDate DESC, d.SortKey DESC
+                                   ROWS UNBOUNDED PRECEDING) AS NewerAndThis
+        FROM DebitItems d
     ),
     Unpaid AS (
         SELECT d.StudentId, d.TermCode, d.DueDate,
@@ -72,6 +102,7 @@ RETURN
         i.InstitutionId,
         i.Code              AS InstitutionCode,
         i.Name              AS InstitutionName,
+        i.Segment,
         p.Name              AS ProgramName,
         t.TermCode,
         t.Description       AS TermDescription,
@@ -119,6 +150,42 @@ RETURN
 GO
 
 /*
+    Revenue recognised between @FromDate and @ToDate, using what had been billed by @AsOfDate.
+    Tuition and fees are earned evenly over the days of the term (straight-line), the usual
+    treatment for term-based tuition. Institutional scholarships reduce revenue (they're a
+    discount, not cash). Withdrawal tuition credits reduce it too.
+    The deferred revenue balance on a date is just this function from the next day onward.
+*/
+CREATE OR ALTER FUNCTION dbo.fn_RevenueRecognized (@FromDate DATE, @ToDate DATE, @AsOfDate DATE)
+RETURNS TABLE
+AS
+RETURN
+    WITH Billed AS (
+        SELECT s.InstitutionId, at.TermCode,
+               SUM(CASE WHEN dc.Category = 'CHG' OR at.DetailCode = 'WDTA' THEN at.Amount ELSE 0 END) AS GrossTuitionFees,
+               -SUM(CASE WHEN at.DetailCode = 'SCHL' THEN at.Amount ELSE 0 END)                     AS Scholarships
+        FROM dbo.AccountTransaction at
+        JOIN dbo.DetailCode dc ON dc.DetailCode = at.DetailCode
+        JOIN dbo.Student s     ON s.StudentId = at.StudentId
+        WHERE at.EffectiveDate <= @AsOfDate
+        GROUP BY s.InstitutionId, at.TermCode
+    ),
+    Share AS (
+        SELECT b.InstitutionId, b.TermCode, b.GrossTuitionFees, b.Scholarships,
+               CAST(DATEDIFF(DAY, GREATEST(@FromDate, t.StartDate), LEAST(@ToDate, t.EndDate)) + 1 AS DECIMAL(9,4))
+                 / (DATEDIFF(DAY, t.StartDate, t.EndDate) + 1) AS EarnedShare
+        FROM Billed b
+        JOIN dbo.Term t ON t.TermCode = b.TermCode
+        WHERE t.StartDate <= @ToDate AND t.EndDate >= @FromDate
+    )
+    SELECT InstitutionId, TermCode,
+           CAST(GrossTuitionFees * EarnedShare AS DECIMAL(14,2))                  AS GrossRevenue,
+           CAST(Scholarships * EarnedShare AS DECIMAL(14,2))                      AS Scholarships,
+           CAST((GrossTuitionFees - Scholarships) * EarnedShare AS DECIMAL(14,2)) AS NetRevenue
+    FROM Share;
+GO
+
+/*
     rpt schema = the only objects the "Ask for a report" feature can query.
     No names or emails here on purpose (FERPA data minimization). A user who needs
     contact details uses the Past-Due report, which is a reviewed, fixed query.
@@ -130,6 +197,7 @@ SELECT
     s.StudentId,
     i.Code          AS InstitutionCode,
     i.Name          AS InstitutionName,
+    i.Segment,
     p.Name          AS ProgramName,
     p.AwardLevel,
     s.EnrollmentStatus,

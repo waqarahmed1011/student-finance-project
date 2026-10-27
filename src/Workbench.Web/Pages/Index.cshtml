@@ -7,23 +7,71 @@
 
 <h1 class="page-title">Tuition Payment Dashboard</h1>
 <p class="page-subtitle">
-    Receivables and payment trends across all five institutions as of @Model.AsOf.ToString("MMMM d, yyyy").
-    Everything here comes from the same balance function the Past-Due Report uses, so the numbers always tie out.
+    Revenue, collections and receivables across all five institutions as of @Model.AsOf.ToString("MMMM d, yyyy").
+    Fiscal year runs July 1 to June 30. Receivables come from the same balance function the Past-Due Report uses,
+    so the numbers always tie out.
 </p>
 
+<h2 class="h6 text-uppercase text-muted mb-2">Revenue and collections, @Model.FiscalYearLabel to date</h2>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Net tuition revenue</div>
+            <div class="kpi-value">@Model.YearToDate.NetRevenue.ToString("C0")</div>
+            <div class="kpi-note">@IndexModel.ChangeText(Model.YearToDate.NetRevenue, Model.PriorYearToDate.NetRevenue)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Scholarships / discounts</div>
+            <div class="kpi-value">@Model.YearToDate.Scholarships.ToString("C0")</div>
+            <div class="kpi-note">@((Model.YearToDate.GrossRevenue == 0 ? 0 : Model.YearToDate.Scholarships / Model.YearToDate.GrossRevenue).ToString("P1")) of gross tuition and fees</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Cash collected</div>
+            <div class="kpi-value text-success">@Model.YearToDate.CashCollected.ToString("C0")</div>
+            <div class="kpi-note">payments + aid; @Model.YearToDate.Refunds.ToString("C0") refunded to students</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Deferred revenue</div>
+            <div class="kpi-value">@Model.Balances.DeferredRevenue.ToString("C0")</div>
+            <div class="kpi-note">billed but not yet earned (rest of current terms)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Net receivables</div>
+            <div class="kpi-value">@Model.NetReceivable.ToString("C0")</div>
+            <div class="kpi-note">after @Model.Allowance.ToString("C0") allowance for credit losses</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-2">
+        <div class="card kpi-card h-100"><div class="card-body">
+            <div class="kpi-label">Days sales outstanding</div>
+            <div class="kpi-value">@(Model.DaysSalesOutstanding?.ToString("0") ?? "n/a")</div>
+            <div class="kpi-note">net receivables / daily revenue (trailing 12 months)</div>
+        </div></div>
+    </div>
+</div>
+
+<h2 class="h6 text-uppercase text-muted mb-2">Receivables</h2>
 <div class="row g-3 mb-4">
     <div class="col-6 col-xl-2">
         <div class="card kpi-card h-100"><div class="card-body">
             <div class="kpi-label">Total receivable</div>
             <div class="kpi-value">@Model.Kpis.TotalReceivable.ToString("C0")</div>
-            <div class="kpi-note">all positive balances</div>
+            <div class="kpi-note">@((Model.Kpis.TotalReceivable - Model.Kpis.PastDueAmount).ToString("C0")) not yet due</div>
         </div></div>
     </div>
     <div class="col-6 col-xl-2">
         <div class="card kpi-card h-100"><div class="card-body">
             <div class="kpi-label">Past due</div>
             <div class="kpi-value text-danger">@Model.Kpis.PastDueAmount.ToString("C0")</div>
-            <div class="kpi-note">@Model.Kpis.StudentsPastDue.ToString("N0") students</div>
+            <div class="kpi-note">@(Model.Kpis.TotalReceivable == 0 ? "" : (Model.Kpis.PastDueAmount / Model.Kpis.TotalReceivable).ToString("P0")) of receivables, @Model.Kpis.StudentsPastDue.ToString("N0") students</div>
         </div></div>
     </div>
     <div class="col-6 col-xl-2">
@@ -44,7 +92,7 @@
         <div class="card kpi-card h-100"><div class="card-body">
             <div class="kpi-label">Collected, last 30 days</div>
             <div class="kpi-value text-success">@Model.Kpis.CollectedLast30Days.ToString("C0")</div>
-            <div class="kpi-note">payments + aid</div>
+            <div class="kpi-note">payments + aid, excluding scholarships</div>
         </div></div>
     </div>
     <div class="col-6 col-xl-2 d-flex">
@@ -57,7 +105,10 @@
 <div class="row g-3 mb-4">
     <div class="col-xl-7">
         <div class="card h-100"><div class="card-body">
-            <h2 class="h6 mb-3">Money received by month and source</h2>
+            <div class="d-flex justify-content-between align-items-baseline">
+                <h2 class="h6 mb-3">Money received by month and source</h2>
+                <span class="small text-muted">Click a month for the breakdown</span>
+            </div>
             <div class="chart-box"><canvas id="trendChart" aria-label="Payments by month and fund source"></canvas></div>
         </div></div>
     </div>
@@ -66,6 +117,57 @@
             <h2 class="h6 mb-3">Past due by institution and age</h2>
             <div class="chart-box"><canvas id="agingChart" aria-label="Past due by institution and aging bucket"></canvas></div>
         </div></div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h6 mb-3">By institution</h2>
+        <div class="table-responsive">
+        <table class="table table-sm table-tight mb-0">
+            <thead>
+                <tr>
+                    <th>Institution</th><th>Segment</th><th class="num">Active students</th>
+                    <th class="num">@Model.PriorFiscalYearLabel net revenue</th><th class="num">Share</th>
+                    <th class="num">@Model.FiscalYearLabel to date</th><th class="num">Cash collected YTD</th>
+                    <th class="num">Receivable</th><th class="num">Past due</th><th class="num">Allowance</th>
+                </tr>
+            </thead>
+            <tbody>
+            @{ var priorTotal = Model.Institutions.Sum(i => i.NetRevenuePriorFY); }
+            @foreach (var i in Model.Institutions)
+            {
+                <tr>
+                    <td>@i.InstitutionName <span class="text-muted">(@i.InstitutionCode)</span></td>
+                    <td>@i.Segment</td>
+                    <td class="num">@i.ActiveStudents.ToString("N0")</td>
+                    <td class="num">@i.NetRevenuePriorFY.ToString("C0")</td>
+                    <td class="num">@(priorTotal == 0 ? "" : (i.NetRevenuePriorFY / priorTotal).ToString("P0"))</td>
+                    <td class="num">@i.NetRevenueYTD.ToString("C0")</td>
+                    <td class="num">@i.CashCollectedYTD.ToString("C0")</td>
+                    <td class="num">@i.Receivable.ToString("C0")</td>
+                    <td class="num">@i.PastDue.ToString("C0") <span class="text-muted">(@(i.Receivable == 0 ? "0%" : (i.PastDue / i.Receivable).ToString("P0")))</span></td>
+                    <td class="num">@Model.AllowanceFor(i).ToString("C0")</td>
+                </tr>
+            }
+                <tr class="fw-semibold">
+                    <td>Total</td><td></td>
+                    <td class="num">@Model.Institutions.Sum(i => i.ActiveStudents).ToString("N0")</td>
+                    <td class="num">@priorTotal.ToString("C0")</td><td class="num">100%</td>
+                    <td class="num">@Model.Institutions.Sum(i => i.NetRevenueYTD).ToString("C0")</td>
+                    <td class="num">@Model.Institutions.Sum(i => i.CashCollectedYTD).ToString("C0")</td>
+                    <td class="num">@Model.Institutions.Sum(i => i.Receivable).ToString("C0")</td>
+                    <td class="num">@Model.Institutions.Sum(i => i.PastDue).ToString("C0")</td>
+                    <td class="num">@Model.Allowance.ToString("C0")</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+        <p class="small text-muted mt-2 mb-0">
+            Revenue is tuition and fees less institutional scholarships, recognised evenly over each term.
+            Allowance uses the aging method (expected loss rate per aging bucket, set in config).
+            Mix and ratios are modelled on Covista's public FY2026 results, scaled to this sample's size.
+        </p>
     </div>
 </div>
 
@@ -106,7 +208,7 @@
 
         const sourceColors = {
             'Title IV aid': '#1f3a5f', 'VA benefits': '#2e7d32', 'Military TA': '#558b2f',
-            'Student self-pay': '#f9a825', 'Payment plan (vendor)': '#ef6c00', 'Employer': '#6a1b9a', 'Scholarship': '#00838f'
+            'Student self-pay': '#f9a825', 'Payment plan (vendor)': '#ef6c00', 'Employer': '#6a1b9a'
         };
         trend.datasets.forEach(d => d.backgroundColor = sourceColors[d.label] || '#90a4ae');
 
@@ -116,7 +218,18 @@
             options: {
                 maintainAspectRatio: false,
                 scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: moneyShort } } },
-                plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } }
+                plugins: { tooltip: { callbacks: {
+                    label: c => `${c.dataset.label}: ${money(c.parsed.y)}`,
+                    footer: () => 'Click for the month breakdown'
+                } } },
+                onClick: (evt, elements, chart) => {
+                    // a click anywhere in a month's column opens that month, not just on a bar segment
+                    const points = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+                    if (points.length) window.location.href = '@Url.Page("/Month")?m=' + trend.keys[points[0].index];
+                },
+                onHover: (evt, elements, chart) => {
+                    chart.canvas.style.cursor = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false).length ? 'pointer' : 'default';
+                }
             }
         });
 

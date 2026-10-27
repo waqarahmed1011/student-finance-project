@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
+using Workbench.Core.Finance;
 using Workbench.Core.PastDue;
 using Workbench.Web.Data;
 using Workbench.Web.Services;
@@ -16,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 
 builder.Services.Configure<HoldPolicyOptions>(builder.Configuration.GetSection("HoldPolicy"));
+builder.Services.Configure<AllowanceRates>(builder.Configuration.GetSection("Allowance"));
 builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = 2 * 1024 * 1024);
 

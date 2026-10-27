@@ -68,4 +68,38 @@ public sealed class ReportRepository
             new { AsOfDate = asOf.ToDateTime(TimeOnly.MinValue) }, commandType: CommandType.StoredProcedure);
         return rows.AsList();
     }
+
+    public async Task<(IReadOnlyList<FinancialPeriod> Periods, FinancialBalances Balances)> GetFinancialSummaryAsync(DateOnly asOf)
+    {
+        await using var conn = _db.CreateWorkbench();
+        using var multi = await conn.QueryMultipleAsync("dbo.usp_FinancialSummary",
+            new { AsOfDate = asOf.ToDateTime(TimeOnly.MinValue) }, commandType: CommandType.StoredProcedure);
+        var periods = (await multi.ReadAsync<FinancialPeriod>()).AsList();
+        var balances = await multi.ReadSingleAsync<FinancialBalances>();
+        return (periods, balances);
+    }
+
+    public async Task<IReadOnlyList<InstitutionFinancials>> GetFinancialsByInstitutionAsync(DateOnly asOf)
+    {
+        await using var conn = _db.CreateWorkbench();
+        var rows = await conn.QueryAsync<InstitutionFinancials>("dbo.usp_FinancialsByInstitution",
+            new { AsOfDate = asOf.ToDateTime(TimeOnly.MinValue) }, commandType: CommandType.StoredProcedure);
+        return rows.AsList();
+    }
+
+    public async Task<IReadOnlyList<MonthReceipt>> GetMonthReceiptsAsync(DateOnly monthStart)
+    {
+        await using var conn = _db.CreateWorkbench();
+        var rows = await conn.QueryAsync<MonthReceipt>("dbo.usp_MonthReceipts",
+            new { MonthStart = monthStart.ToDateTime(TimeOnly.MinValue) }, commandType: CommandType.StoredProcedure);
+        return rows.AsList();
+    }
+
+    public async Task<IReadOnlyList<MonthComparison>> GetMonthComparisonsAsync(DateOnly monthStart)
+    {
+        await using var conn = _db.CreateWorkbench();
+        var rows = await conn.QueryAsync<MonthComparison>("dbo.usp_MonthReceiptComparisons",
+            new { MonthStart = monthStart.ToDateTime(TimeOnly.MinValue) }, commandType: CommandType.StoredProcedure);
+        return rows.AsList();
+    }
 }

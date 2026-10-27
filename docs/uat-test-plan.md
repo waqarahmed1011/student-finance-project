@@ -27,13 +27,18 @@ Tester: ________  Date: ________  Build / commit: ________
 | 12 | DB-01 | Open Dashboard | Five KPI tiles populated | | |
 | 13 | DB-05 | Compare Dashboard "Past due" with Past-Due Report total past due (no filters) | Same amount | | |
 | 14 | DB-02 | Hover a bar in "Money received by month" | Tooltip shows fund source and dollar amount; January, May and September spikes from Title IV disbursements | | |
-| 15 | DB-04 | Check collection rate table | Older terms collected at a higher rate than Fall 2026 | | |
+| 15 | DB-04 | Check collection rate table | Completed terms about 97 to 98%; Fall 2026 lower because it is mid-term | | |
+| 15a | DB-06 | Check the revenue and collections row | FY2027-to-date revenue shows a single-digit increase vs same period last year; net receivables = total receivable minus allowance; DSO about 30 days | AllowancePolicyTests | |
+| 15b | DB-07 | Check the by-institution table | Revenue split roughly 37% nursing, 44% online, 19% medical/veterinary; totals match the KPI tiles | | |
+| 15c | DB-08 | Click the September 2026 column on the money-received chart | Opens Money received: September 2026; Title IV aid is the largest source with a spike on the disbursement day | | |
+| 15d | DB-08 | On the month page click "Title IV aid", then "LCN" | Transaction list narrows to both filters; Export CSV downloads only those rows | | |
+| 15e | DB-08 | Click the previous-month button back to July 2025 | "Same month last year" says it is before the data starts | | |
 
 ## Vendor Reconciliation
 
 | # | Req | Steps | Expected result | Auto test | Pass/Fail |
 |---|-----|-------|-----------------|-----------|-----------|
-| 16 | RC-03, RC-04 | Enter a name, click "Run the sample vendor file" | 403 rows, 394 matched, 10 exceptions: 3 missing in ledger, 2 amount mismatch, 1 wrong student, 1 duplicate, 1 unknown student, 1 invalid row, 1 not in vendor file | PaymentMatcherTests | |
+| 16 | RC-03, RC-04 | Enter a name, click "Run the sample vendor file" | 418 rows, 409 matched, 10 exceptions: 3 missing in ledger, 2 amount mismatch, 1 wrong student, 1 duplicate, 1 unknown student, 1 invalid row, 1 not in vendor file | PaymentMatcherTests | |
 | 17 | RC-01 | Upload a CSV missing the plan_id column | Error lists the missing column; nothing saved | VendorFileParserTests | |
 | 18 | RC-02 | Upload a CSV where one row has amount "abc" | Import completes; that row is an Invalid row exception | VendorFileParserTests | |
 | 19 | RC-05 | After running the sample, check the student from a "Missing in ledger" exception on the Past-Due Report | Balance unchanged (nothing was posted) | | |

@@ -25,7 +25,7 @@ Out of scope for this version: posting payments, placing holds in the student sy
 | ID | Requirement |
 |----|-------------|
 | PD-01 | Show every student-term with a past-due balance as of a chosen date (default today). |
-| PD-02 | Age balances using FIFO payment application: payments and aid apply to the oldest charges first, and each unpaid piece is aged from its own due date into Current, 1-30, 31-60, 61-90 and 90+ day buckets. |
+| PD-02 | Age balances using FIFO payment application: payments and aid apply to the oldest charges first, and each unpaid piece is aged from its own due date into Current, 1-30, 31-60, 61-90 and 90+ day buckets. Students on an active payment plan are aged on the plan's installment schedule. |
 | PD-03 | Filter by institution, term and oldest aging bucket. |
 | PD-04 | For each row, recommend one action: Hold eligible, VA protected, VA partially protected, VA follow-up, On payment plan, or Reminder only. |
 | PD-05 | **VA protection (38 U.S.C. 3679(e))**: if a Chapter 33 or 31 payment is pending, no hold or late fee for the amount VA is expected to pay, until VA pays or 90 days after certification, whichever is first. |
@@ -45,6 +45,9 @@ Out of scope for this version: posting payments, placing holds in the student sy
 | DB-03 | Past-due dollars by institution and aging bucket. |
 | DB-04 | Collection rate by term (payments + aid divided by net charges). |
 | DB-05 | Dashboard and Past-Due Report must use the same balance logic so totals always match. |
+| DB-06 | Fiscal-year financials (July 1 to June 30): net tuition revenue recognised evenly over each term, scholarships/discounts, cash collected and refunds, deferred revenue, allowance for credit losses (aging method, rates in config), net receivables and days sales outstanding. Year-to-date compared with the same period last year. |
+| DB-07 | By-institution table: segment, active students, prior-year and year-to-date revenue, cash, receivables, past due, allowance. |
+| DB-08 | Clicking a month on the money-received chart opens that month: totals vs prior month and same month last year, split by fund source and school, a day-by-day chart, and a filterable transaction list with CSV export. |
 
 ## 3. Vendor Reconciliation
 

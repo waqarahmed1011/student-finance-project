@@ -7,6 +7,11 @@ Title IV disbursements and credit balance refunds, VA certifications that are st
 payment, military TA, employer payments, payment plans run by a third-party vendor, late payers,
 withdrawals with Return of Title IV adjustments, and so on.
 
+Proportions are modelled on Covista's FY2026 public results (year ended June 30, 2026), scaled
+from ~99,500 students to 2,500: revenue mix ~38% nursing (Chamberlain-like), ~41% online
+(Walden-like), ~20% medical and veterinary; revenue per student ~$19k nursing, ~$15k online,
+~$78k med/vet; total ~$49M a year.
+
 Output:
     db/05_seed_data.sql
     samples/clearpath_settlement_2026-10-01_2026-10-09.csv   (vendor file with planted exceptions)
@@ -29,38 +34,50 @@ SEED_SQL = ROOT / "db" / "05_seed_data.sql"
 VENDOR_CSV = ROOT / "samples" / "clearpath_settlement_2026-10-01_2026-10-09.csv"
 VENDOR_CSV_WEB_COPY = ROOT / "src" / "Workbench.Web" / "wwwroot" / "samples" / VENDOR_CSV.name  # served by the web app
 
-DATA_CUTOFF = date(2026, 10, 21)  # nothing gets posted after this date
-STUDENT_COUNT = 2500
+DATA_CUTOFF = date(2026, 10, 27)  # nothing gets posted after this date
+STUDENT_COUNT = 3550
 
+# id, code, name, segment
 INSTITUTIONS = [
-    (1, "LCN", "Lakeshore College of Nursing"),
-    (2, "MHU", "Meridian Health University"),
-    (3, "CSM", "Coral Sound School of Medicine"),
-    (4, "CVM", "Coral Sound School of Veterinary Medicine"),
-    (5, "HIA", "Heartland Institute of Allied Health"),
+    (1, "LCN", "Lakeshore College of Nursing", "Nursing"),
+    (2, "MHU", "Meridian Health University", "Online"),
+    (3, "CSM", "Coral Sound School of Medicine", "Medical and Veterinary"),
+    (4, "WSM", "Windward University School of Medicine", "Medical and Veterinary"),
+    (5, "CVM", "Coral Sound School of Veterinary Medicine", "Medical and Veterinary"),
 ]
 
-# id, institution, code, name, level, per-credit rate (None = flat), flat tuition, credit range, weight
+# id, institution, code, name, level, per-credit rate (None = flat), flat tuition, credit range, weight, online
+# Weights give ~40% nursing / ~55% online / ~5% med-vet students, matching Covista's enrollment mix.
 PROGRAMS = [
-    (101, 1, "BSN",   "Bachelor of Science in Nursing",        "Undergraduate", 680, None, (12, 16), 18),
-    (102, 1, "RNBSN", "RN to BSN (Online)",                    "Undergraduate", 590, None, (6, 9), 14),
-    (103, 1, "MSN",   "Master of Science in Nursing",          "Graduate",      715, None, (6, 9), 8),
-    (201, 2, "MPH",   "Master of Public Health",               "Graduate",      560, None, (6, 9), 9),
-    (202, 2, "DNP",   "Doctor of Nursing Practice",            "Doctoral",      850, None, (6, 9), 7),
-    (203, 2, "MSW",   "Master of Social Work",                 "Graduate",      610, None, (6, 12), 9),
-    (301, 3, "MD",    "Doctor of Medicine",                    "Doctoral",      None, 27350, None, 11),
-    (401, 4, "DVM",   "Doctor of Veterinary Medicine",         "Doctoral",      None, 24900, None, 7),
-    (501, 5, "MA",    "Medical Assisting Diploma",             "Undergraduate", 420, None, (9, 15), 10),
-    (502, 5, "HIM",   "Health Information Management (BS)",    "Undergraduate", 450, None, (9, 12), 7),
+    (101, 1, "BSN",   "Bachelor of Science in Nursing",            "Undergraduate", 750, None, (12, 15), 178, False),
+    (102, 1, "RNBSN", "RN to BSN (Online)",                        "Undergraduate", 590, None, (6, 9), 139, True),
+    (103, 1, "MSN",   "Master of Science in Nursing (Online)",     "Graduate",      690, None, (6, 9), 80, True),
+    (201, 2, "MSNO",  "MS in Nursing",                             "Graduate",      765, None, (6, 9), 165, True),
+    (202, 2, "MPH",   "Master of Public Health",                   "Graduate",      600, None, (6, 9), 110, True),
+    (203, 2, "MSW",   "Master of Social Work",                     "Graduate",      615, None, (6, 12), 110, True),
+    (204, 2, "DNP",   "Doctor of Nursing Practice",                "Doctoral",      850, None, (6, 9), 80, True),
+    (205, 2, "BSHS",  "BS in Health Studies",                      "Undergraduate", 355, None, (9, 15), 86, True),
+    (301, 3, "MD",    "Doctor of Medicine",                        "Doctoral",      None, 25500, None, 20, False),
+    (401, 4, "MD",    "Doctor of Medicine",                        "Doctoral",      None, 25000, None, 15, False),
+    (501, 5, "DVM",   "Doctor of Veterinary Medicine",             "Doctoral",      None, 23500, None, 16, False),
 ]
 
 # code, description, start, end, payment due, fee due
 TERMS = [
+    ("202520", "Summer 2025", date(2025, 5, 11), date(2025, 8, 15),  date(2025, 5, 25), date(2025, 5, 2)),
     ("202530", "Fall 2025",   date(2025, 8, 31), date(2025, 12, 19), date(2025, 9, 14), date(2025, 8, 15)),
     ("202610", "Spring 2026", date(2026, 1, 11), date(2026, 5, 1),   date(2026, 1, 25), date(2026, 1, 2)),
     ("202620", "Summer 2026", date(2026, 5, 10), date(2026, 8, 14),  date(2026, 5, 24), date(2026, 5, 1)),
     ("202630", "Fall 2026",   date(2026, 8, 30), date(2026, 12, 18), date(2026, 9, 13), date(2026, 8, 14)),
 ]
+
+# Calibration knob for every tuition rate. At 1.0, ~2,500 enrolled students produce ~$49M a year,
+# i.e. Covista's ~$19.6k of revenue per enrolled student.
+TUITION_SCALE = 1.0
+
+# online programs run two 8-week sessions per term; session 2 is billed and due on its own schedule
+SESSION2_BILLED_DAY = 42
+SESSION2_DUE_DAY = 70
 
 DETAIL_CODES = [
     ("TUIT", "Tuition",                                "CHG", "Institution"),
@@ -81,6 +98,7 @@ DETAIL_CODES = [
     ("RFND", "Credit Balance Refund to Student",       "ADJ", "TitleIV"),
     ("WDTA", "Withdrawal Tuition Adjustment",          "ADJ", "Institution"),
     ("RT4R", "Return of Title IV Funds",               "ADJ", "TitleIV"),
+    ("WOFF", "Bad Debt Write-off (sent to collections)", "ADJ", "Institution"),
 ]
 
 FIRST_NAMES = """Aaliyah Abdul Adriana Aisha Alejandro Amara Andre Angela Anthony Ariana Ashley Ayesha Bianca
@@ -127,6 +145,7 @@ class Student:
 txns: list[Txn] = []
 va_certs = []        # (student, term, chapter, certified, expected, status, paid)
 plans = []           # (student, term, vendor_plan_id, amount, installments, enrolled, status)
+installments = []    # (vendor_plan_id, installment_no, due_date, amount)
 ref_counter = [100000]
 
 
@@ -175,14 +194,14 @@ def make_students() -> list[Student]:
 
 def charges_for(s: Student, term) -> tuple[float, float, float, int]:
     """returns tuition, fees, clinical fee, credits"""
-    _, _, code, _, level, rate, flat, credit_range, _ = s.program
+    _, _, code, _, level, rate, flat, credit_range, _, _ = s.program
     if flat:
-        tuition, credits = flat, 15
+        tuition, credits = money(flat * TUITION_SCALE), 15
     else:
         credits = random.randint(*credit_range)
-        tuition = rate * credits
+        tuition = money(rate * TUITION_SCALE) * credits
     fees = 1450 if flat else 395 if level == "Undergraduate" else 285
-    clinical = 350 if code in ("BSN", "MSN", "DNP") else 0
+    clinical = 350 if code in ("BSN", "MSN", "MSNO", "DNP") else 0
     return tuition, fees, clinical, credits
 
 
@@ -191,17 +210,26 @@ def simulate_term(s: Student, term, is_first_term: bool):
     sid = s.student_id
     level = s.program[4]
     is_flat = s.program[6] is not None
+    online = s.program[9]
     tuition, fees, clinical, credits = charges_for(s, term)
     full_time = credits >= 12 if level == "Undergraduate" else credits >= 6
 
+    # online programs: half the tuition is session 1 (billed with the term), half is session 2
+    session1 = money(tuition / 2) if online else tuition
+    session2 = tuition - session1
+    s2_billed = start + timedelta(days=SESSION2_BILLED_DAY)
+    s2_due = start + timedelta(days=SESSION2_DUE_DAY)
+
     # most students register ahead of time; late registrants get billed with a due date 14 days out
-    if random.random() < 0.08:
+    if random.random() < 0.06:
         registered = start + timedelta(days=random.randint(5, 30))
         add(Txn(sid, code, "FEES", fees, registered, registered + timedelta(days=14)))
-        add(Txn(sid, code, "TUIT", tuition, registered, registered + timedelta(days=14)))
+        add(Txn(sid, code, "TUIT", session1, registered, registered + timedelta(days=14)))
     else:
         add(Txn(sid, code, "FEES", fees, fee_due - timedelta(days=21), fee_due))
-        add(Txn(sid, code, "TUIT", tuition, start - timedelta(days=21), due))
+        add(Txn(sid, code, "TUIT", session1, start - timedelta(days=21), due))
+    if session2:
+        add(Txn(sid, code, "TUIT", session2, s2_billed, s2_due))
     clinical_posted = start + timedelta(days=28)
     if clinical:
         add(Txn(sid, code, "CLIN", clinical, clinical_posted, clinical_posted + timedelta(days=21)))
@@ -306,18 +334,25 @@ def simulate_term(s: Student, term, is_first_term: bool):
     # --- student's own share ---
     owed = money(charges - paid_so_far)
     if owed <= 0:
-        return
+        return 0.0
 
     if withdraw_date:
         if random.random() < 0.3:
             add(Txn(sid, code, "CARD", -owed * random.choice([1, 0.5]), withdraw_date + timedelta(days=random.randint(40, 90))))
-        return
+        return 0.0
 
     weights = [58, 30, 7, 5]
     if va_pending and s.va_pct < 1:
         weights = [40, 10, 25, 25]  # partial-eligibility students often hold off paying their share until VA pays
     behavior = random.choices(["card", "plan", "late", "delinquent"], weights=weights)[0]
-    if behavior == "card":
+    if behavior == "card" and online:
+        # pays each session's share by that session's due date
+        part2 = min(owed, session2)
+        part1 = owed - part2
+        if part1 > 0:
+            add(Txn(sid, code, "CARD", -part1, due - timedelta(days=random.randint(-2, 12))))
+        add(Txn(sid, code, "CARD", -part2, s2_due - timedelta(days=random.randint(-2, 10))))
+    elif behavior == "card":
         if random.random() < 0.3:
             add(Txn(sid, code, "CARD", -owed / 2, due - timedelta(days=random.randint(1, 10))))
             add(Txn(sid, code, "CARD", -(owed - money(owed / 2)), due + timedelta(days=random.randint(-3, 20))))
@@ -329,50 +364,80 @@ def simulate_term(s: Student, term, is_first_term: bool):
         portion = random.choice([0, 0, 0.25, 0.5])
         if portion:
             add(Txn(sid, code, "CARD", -owed * portion, due + timedelta(days=random.randint(5, 40))))
+        return money(owed * (1 - portion))
     else:
-        installments = 4
-        each = money(owed / installments)
+        plan_count = 4
+        each = money(owed / plan_count)
         plan_id = f"CPP-{300000 + len(plans) * 7 + random.randint(1, 6)}"
         enrolled = start - timedelta(days=random.randint(5, 25))
         defaults_after = random.choice([None] * 9 + [2])  # one in ten stops paying after 2 installments
         made = 0
-        for k in range(installments):
+        installments_rows = []
+        for k in range(plan_count):
             month = start.month + k + (1 if start.day > 20 else 0)
             year = start.year + (month - 1) // 12
             month = (month - 1) % 12 + 1
-            pay_day = date(year, month, 5) + timedelta(days=random.randint(-2, 3))
+            inst_due = date(year, month, 5)
+            inst_amt = each if k < plan_count - 1 else money(owed - each * (plan_count - 1))
+            installments_rows.append((plan_id, k + 1, inst_due, inst_amt))
+            pay_day = inst_due + timedelta(days=random.randint(-2, 3))
             if defaults_after is not None and k >= defaults_after:
-                break
+                continue  # stopped paying; the schedule still says this was due
             if pay_day > DATA_CUTOFF:
-                break
-            amt = each if k < installments - 1 else owed - each * (installments - 1)
-            add(Txn(sid, code, "PPLN", -amt, pay_day))
+                continue
+            add(Txn(sid, code, "PPLN", -inst_amt, pay_day))
             made += 1
-        if defaults_after is not None and made >= defaults_after:
-            status = "CANCELLED"
-        elif made == installments:
+        missed_due = [r[2] for r in installments_rows[defaults_after:]] if defaults_after is not None else []
+        if missed_due and missed_due[0] <= DATA_CUTOFF - timedelta(days=10):
+            status = "CANCELLED"  # vendor cancels about 10 days after a missed installment
+        elif made == plan_count:
             status = "COMPLETED"
         else:
             status = "ACTIVE"
-        plans.append((sid, code, plan_id, owed, installments, enrolled, status))
+        plans.append((sid, code, plan_id, owed, plan_count, enrolled, status))
+        installments.extend(installments_rows)
+        if status == "CANCELLED":
+            return money(owed - each * made)
+    return 0.0
 
 
 def simulate(students):
-    first_term_weights = [35, 25, 15, 25]
+    # roughly steady enrolment growing ~9% a year, like Covista's
+    first_term_weights = [58, 10, 11, 7, 14]
     for s in students:
         first = random.choices(range(len(TERMS)), weights=first_term_weights)[0]
+        carry, carry_term = 0.0, None
         for idx in range(first, len(TERMS)):
             term = TERMS[idx]
             if idx > first:
                 if s.status == "Withdrawn":
                     break
+                if carry > 0:
+                    # a registration hold: pay the old balance before the term starts, or don't come back
+                    if random.random() < 0.6:
+                        add(Txn(s.student_id, carry_term, "CARD", -carry, term[2] - timedelta(days=random.randint(3, 14))))
+                    else:
+                        s.status = "Inactive"
+                        break
                 if random.random() < 0.06:
                     s.status = "Inactive"
                     break
-                if term[0] == "202620" and s.program[6] is None and random.random() < 0.35:
-                    continue  # skipped summer
+                if term[0] in ("202520", "202620") and s.program[2] == "BSN" and random.random() < 0.35:
+                    continue  # campus BSN students sometimes skip summer; online programs run year-round
             s.terms.append(term[0])
-            simulate_term(s, term, idx == first)
+            carry, carry_term = simulate_term(s, term, idx == first), term[0]
+
+
+def write_off_old_balances():
+    """Balances still unpaid ~9 months after the term ends go to a collection agency and come off the books."""
+    term_end = {t[0]: t[3] for t in TERMS}
+    balances = {}
+    for t in txns:
+        balances[(t.student_id, t.term)] = balances.get((t.student_id, t.term), 0) + t.amount
+    for (sid, term), bal in balances.items():
+        when = term_end[term] + timedelta(days=270)
+        if bal > 1 and when <= DATA_CUTOFF:
+            add(Txn(sid, term, "WOFF", -bal, when))
 
 
 def assign_vendor_refs():
@@ -454,7 +519,7 @@ def insert_block(table, columns, rows, batch=900):
 def write_sql(students):
     parts = ["-- Generated by tools/generate_seed_data.py. Synthetic data only. Do not edit by hand.",
              "SET NOCOUNT ON;", ""]
-    parts.append(insert_block("dbo.Institution", ["InstitutionId", "Code", "Name"], INSTITUTIONS))
+    parts.append(insert_block("dbo.Institution", ["InstitutionId", "Code", "Name", "Segment"], INSTITUTIONS))
     parts.append(insert_block("dbo.Program", ["ProgramId", "InstitutionId", "Code", "Name", "AwardLevel"],
                               [p[:5] for p in PROGRAMS]))
     parts.append(insert_block("dbo.Term", ["TermCode", "Description", "StartDate", "EndDate", "PaymentDueDate"],
@@ -472,6 +537,8 @@ def write_sql(students):
     parts.append(insert_block(
         "dbo.PaymentPlan",
         ["StudentId", "TermCode", "VendorPlanId", "PlanAmount", "Installments", "EnrolledDate", "Status"], plans))
+    parts.append(insert_block(
+        "dbo.PaymentPlanInstallment", ["VendorPlanId", "InstallmentNo", "DueDate", "Amount"], installments))
     txns.sort(key=lambda t: (t.effective, t.student_id))
     parts.append(insert_block(
         "dbo.AccountTransaction",
@@ -481,12 +548,44 @@ def write_sql(students):
     SEED_SQL.write_text("\n".join(parts))
 
 
+def print_calibration(students):
+    """Quick check of the totals against the Covista-scaled targets (revenue recognised evenly over each term)."""
+    fy_start, fy_end = date(2025, 7, 1), date(2026, 6, 30)
+    term_dates = {t[0]: (t[2], t[3]) for t in TERMS}
+    seg_of = {i[0]: i[3] for i in INSTITUTIONS}
+    inst_of = {s.student_id: s.institution_id for s in students}
+    revenue = {}
+    for t in txns:
+        if t.code in ("TUIT", "FEES", "CLIN", "MATL", "WDTA", "SCHL"):
+            start, end = term_dates[t.term]
+            overlap = (min(end, fy_end) - max(start, fy_start)).days + 1
+            if overlap > 0:
+                seg = seg_of[inst_of[t.student_id]]
+                revenue[seg] = revenue.get(seg, 0) + t.amount * overlap / ((end - start).days + 1)
+    total = sum(revenue.values())
+    print(f"FY2026 net revenue ${total/1e6:.1f}M (target ~$49M)")
+    for seg, amt in sorted(revenue.items()):
+        print(f"  {seg:<24} ${amt/1e6:5.1f}M  {amt/total:5.1%}")
+    ytd = {}
+    for label, (a, b) in {"FY2026 YTD": (date(2025, 7, 1), date(2025, 10, 27)),
+                          "FY2027 YTD": (date(2026, 7, 1), date(2026, 10, 27))}.items():
+        ytd[label] = sum(t.amount * ((min(term_dates[t.term][1], b) - max(term_dates[t.term][0], a)).days + 1)
+                         / ((term_dates[t.term][1] - term_dates[t.term][0]).days + 1)
+                         for t in txns if t.code in ("TUIT", "FEES", "CLIN", "MATL", "WDTA", "SCHL")
+                         and term_dates[t.term][0] <= b and term_dates[t.term][1] >= a)
+    print(f"YTD growth: {ytd['FY2027 YTD'] / ytd['FY2026 YTD'] - 1:+.1%} (Covista ~+9%)")
+    fall = [s for s in students if "202630" in s.terms]
+    print(f"Fall 2026 students: {len(fall)}")
+
+
 def main():
     students = make_students()
     simulate(students)
+    write_off_old_balances()
     assign_vendor_refs()
     file_rows = plant_vendor_file_exceptions(students)
     write_sql(students)
+    print_calibration(students)
     print(f"students={len(students)} transactions={len(txns)} va_certs={len(va_certs)} "
           f"plans={len(plans)} vendor_file_rows={file_rows}")
 

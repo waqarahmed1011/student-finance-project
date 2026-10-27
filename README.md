@@ -3,12 +3,12 @@
 A student finance reporting and reconciliation tool built on SQL Server and ASP.NET Core. It covers three requests a Student Finance team makes all the time:
 
 1. **"Send me the students with past-due balances."** Aged past-due report where every row is checked against the hold rules: VA pending-payment protection under 38 U.S.C. 3679(e), active payment plans, and a minimum balance threshold.
-2. **"Build me a dashboard of tuition payment trends."** Receivables, money received by fund source, past due by institution and age, and collection rate by term.
+2. **"Build me a dashboard of tuition payment trends."** Fiscal-year revenue, cash, deferred revenue, allowance and DSO; money received by fund source with a click-through breakdown for any month; receivables by institution and age; collection rate by term.
 3. **"The payment plan vendor's file doesn't match what we posted."** Upload the vendor settlement file, compare it to the ledger, and work an exception queue with an audit trail.
 
 Plus **Ask for a Report**: type a question in plain English, AI drafts the SQL, a person reviews it, and it runs under a read-only login that can only see de-identified reporting views.
 
-All data is synthetic: about 2,500 made-up students across five fictional institutions.
+All data is synthetic: about 2,500 enrolled students across five fictional institutions, with proportions modelled on Covista's public FY2026 results scaled down about 40x (~$49M revenue, ~38% nursing / 43% online / 19% medical and veterinary, ~30 days of receivables).
 
 ![Dashboard](docs/images/dashboard.png)
 
@@ -16,7 +16,8 @@ All data is synthetic: about 2,500 made-up students across five fictional instit
 
 | | Where |
 |---|---|
-| FIFO AR aging in one inline table-valued function (window functions) that every report reads from | [`db/02_views.sql`](db/02_views.sql) |
+| FIFO AR aging in one inline table-valued function (window functions), payment-plan aware, that every report reads from | [`db/02_views.sql`](db/02_views.sql) |
+| Straight-line revenue recognition, deferred revenue, aging-method allowance and DSO | [`fn_RevenueRecognized`](db/02_views.sql), [`AllowancePolicy.cs`](src/Workbench.Core/Finance/AllowancePolicy.cs) |
 | VA 3679(e) protection, payment plan and threshold rules, with tests for the 90-day boundary and partial coverage | [`HoldPolicy.cs`](src/Workbench.Core/PastDue/HoldPolicy.cs), [tests](tests/Workbench.Tests/HoldPolicyTests.cs) |
 | Vendor file reconciliation: 7 exception types, never posts anything | [`PaymentMatcher.cs`](src/Workbench.Core/Reconciliation/PaymentMatcher.cs) |
 | AI SQL guard using Microsoft's T-SQL parser (ScriptDom), not keyword matching | [`ReportSqlGuard.cs`](src/Workbench.Core/Reporting/ReportSqlGuard.cs) |
@@ -26,16 +27,20 @@ All data is synthetic: about 2,500 made-up students across five fictional instit
 
 ## Screens
 
-| Past-Due Report (VA partially protected) | Vendor reconciliation exceptions |
+| Month drill-down (click a month on the dashboard) | Past-Due Report (VA partially protected) |
 |---|---|
-| ![Past-due](docs/images/past-due.png) | ![Reconciliation](docs/images/reconciliation.png) |
+| ![Month](docs/images/month.png) | ![Past-due](docs/images/past-due.png) |
+
+| Vendor reconciliation exceptions |
+|---|
+| ![Reconciliation](docs/images/reconciliation.png) |
 
 ## Stack
 
 - **SQL Server / Azure SQL**: schema, inline TVF for balances and aging, stored procedures for each report, two database logins
 - **C# / ASP.NET Core 8 Razor Pages**, Dapper, Bootstrap, Chart.js
 - **Workbench.Core** class library for business rules (no database dependency, reusable from a WinForms tool or batch job)
-- **xUnit**: 52 tests
+- **xUnit**: 57 tests
 - **Google Gemini** for drafting SQL from plain English (optional)
 - **Python** for the synthetic data generator
 

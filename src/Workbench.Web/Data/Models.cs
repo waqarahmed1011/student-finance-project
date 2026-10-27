@@ -113,3 +113,63 @@ public sealed class AuditEntry
     public string? EntityId { get; init; }
     public string? Details { get; init; }
 }
+
+public sealed class FinancialPeriod
+{
+    public string Period { get; init; } = "";
+    public DateTime FromDate { get; init; }
+    public DateTime ToDate { get; init; }
+    public decimal GrossRevenue { get; init; }
+    public decimal Scholarships { get; init; }
+    public decimal NetRevenue { get; init; }
+    public decimal CashCollected { get; init; }
+    public decimal Refunds { get; init; }
+}
+
+public sealed class FinancialBalances
+{
+    public decimal DeferredRevenue { get; init; }
+    public decimal NetRevenueTrailing12 { get; init; }
+}
+
+public sealed class InstitutionFinancials
+{
+    public int InstitutionId { get; init; }
+    public string InstitutionCode { get; init; } = "";
+    public string InstitutionName { get; init; } = "";
+    public string Segment { get; init; } = "";
+    public decimal NetRevenuePriorFY { get; init; }
+    public decimal NetRevenueYTD { get; init; }
+    public decimal CashCollectedYTD { get; init; }
+    public decimal Receivable { get; init; }
+    public decimal NotYetDue { get; init; }
+    public decimal Due1To30 { get; init; }
+    public decimal Due31To60 { get; init; }
+    public decimal Due61To90 { get; init; }
+    public decimal Due90Plus { get; init; }
+    public decimal PastDue { get; init; }
+    public int ActiveStudents { get; init; }
+}
+
+public sealed class MonthReceipt
+{
+    public int TransactionId { get; init; }
+    public DateTime EffectiveDate { get; init; }
+    public string StudentId { get; init; } = "";
+    public string StudentName { get; init; } = "";
+    public string InstitutionCode { get; init; } = "";
+    public string TermCode { get; init; } = "";
+    public string DetailCode { get; init; } = "";
+    public string Description { get; init; } = "";
+    public string FundSource { get; init; } = "";
+    public decimal Amount { get; init; }
+    public string? ExternalRef { get; init; }
+}
+
+public sealed class MonthComparison
+{
+    public string Label { get; init; } = "";
+    public DateTime MonthStart { get; init; }
+    public decimal? Amount { get; init; }
+    public bool HasData { get; init; }
+}

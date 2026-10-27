@@ -17,7 +17,8 @@ GO
 CREATE TABLE dbo.Institution (
     InstitutionId   INT           NOT NULL PRIMARY KEY,
     Code            VARCHAR(10)   NOT NULL UNIQUE,
-    Name            NVARCHAR(100) NOT NULL
+    Name            NVARCHAR(100) NOT NULL,
+    Segment         VARCHAR(30)   NOT NULL   -- Nursing, Online, Medical and Veterinary
 );
 
 CREATE TABLE dbo.Program (
@@ -98,6 +99,15 @@ CREATE TABLE dbo.PaymentPlan (
     EnrolledDate    DATE          NOT NULL,
     Status          VARCHAR(10)   NOT NULL,  -- ACTIVE, COMPLETED, CANCELLED (vendor cancels after missed installments)
     CONSTRAINT UQ_PaymentPlan UNIQUE (StudentId, TermCode)
+);
+
+/* The plan's installment schedule. Aging uses these due dates for students on a plan. */
+CREATE TABLE dbo.PaymentPlanInstallment (
+    VendorPlanId    VARCHAR(20)   NOT NULL REFERENCES dbo.PaymentPlan (VendorPlanId),
+    InstallmentNo   TINYINT       NOT NULL,
+    DueDate         DATE          NOT NULL,
+    Amount          DECIMAL(12,2) NOT NULL,
+    CONSTRAINT PK_PaymentPlanInstallment PRIMARY KEY (VendorPlanId, InstallmentNo)
 );
 
 /* Third-party vendor settlement file reconciliation */

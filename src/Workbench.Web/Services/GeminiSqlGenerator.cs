@@ -30,8 +30,8 @@ public sealed class GeminiSqlGenerator : IReportSqlGenerator
 {
     private const string SchemaDescription = """
         rpt.Students            one row per student
-            StudentId, InstitutionCode, InstitutionName, ProgramName,
-            AwardLevel ('Undergraduate','Graduate','Doctoral'),
+            StudentId, InstitutionCode, InstitutionName, Segment ('Nursing','Online','Medical and Veterinary'),
+            ProgramName, AwardLevel ('Undergraduate','Graduate','Doctoral'),
             EnrollmentStatus ('Active','Withdrawn','Inactive'),
             MilitaryAffiliation ('Veteran','ActiveDuty','Dependent' or NULL)
 
@@ -57,9 +57,11 @@ public sealed class GeminiSqlGenerator : IReportSqlGenerator
         rpt.PaymentPlans        third-party payment plan enrollments
             StudentId, TermCode, PlanAmount, Installments, EnrolledDate, Status ('ACTIVE','COMPLETED','CANCELLED')
 
-        Term codes: 202530 = Fall 2025, 202610 = Spring 2026, 202620 = Summer 2026, 202630 = Fall 2026.
-        Institution codes: LCN Lakeshore College of Nursing, MHU Meridian Health University,
-        CSM Coral Sound School of Medicine, CVM Coral Sound School of Veterinary Medicine, HIA Heartland Institute of Allied Health.
+        Term codes: 202520 = Summer 2025, 202530 = Fall 2025, 202610 = Spring 2026, 202620 = Summer 2026, 202630 = Fall 2026.
+        Fiscal year runs July 1 to June 30 (FY2027 = July 2026 to June 2027).
+        Institution codes: LCN Lakeshore College of Nursing (Nursing), MHU Meridian Health University (Online),
+        CSM Coral Sound School of Medicine, WSM Windward University School of Medicine,
+        CVM Coral Sound School of Veterinary Medicine (the last three are the Medical and Veterinary segment).
         """;
 
     private static readonly string[] DefaultModels = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];

@@ -8,8 +8,9 @@ All data is synthetic. Table and column names are generic on purpose; the commen
 | Column | Type | Notes |
 |---|---|---|
 | InstitutionId | int | PK |
-| Code | varchar(10) | LCN, MHU, CSM, CVM, HIA |
+| Code | varchar(10) | LCN, MHU, CSM, WSM, CVM |
 | Name | nvarchar(100) | |
+| Segment | varchar(30) | Nursing, Online, Medical and Veterinary (mirrors Covista's three reporting segments) |
 
 ### Program
 | Column | Type | Notes |
@@ -22,7 +23,7 @@ All data is synthetic. Table and column names are generic on purpose; the commen
 ### Term (Banner STVTERM)
 | Column | Type | Notes |
 |---|---|---|
-| TermCode | char(6) | 202530 Fall 2025, 202610 Spring 2026, 202620 Summer 2026, 202630 Fall 2026 |
+| TermCode | char(6) | 202520 Summer 2025, 202530 Fall 2025, 202610 Spring 2026, 202620 Summer 2026, 202630 Fall 2026 |
 | StartDate, EndDate | date | |
 | PaymentDueDate | date | Default due date for tuition |
 
@@ -42,7 +43,7 @@ All data is synthetic. Table and column names are generic on purpose; the commen
 | Category | char(3) | CHG charge, PAY payment, AID aid/benefit, ADJ adjustment |
 | FundSource | varchar(12) | Institution, SelfPay, TitleIV, VA, MilitaryTA, Employer, PaymentPlan, Scholarship |
 
-Codes: TUIT, FEES, CLIN, MATL (charges); PELL, DLSU, DLUN, GPLS, VA33, VA31, MLTA, SCHL (aid); CARD, PPLN, EMPL (payments); RFND credit balance refund, WDTA withdrawal tuition adjustment, RT4R Return of Title IV funds (adjustments).
+Codes: TUIT, FEES, CLIN, MATL (charges); PELL, DLSU, DLUN, GPLS, VA33, VA31, MLTA, SCHL (aid); CARD, PPLN, EMPL (payments); RFND credit balance refund, WDTA withdrawal tuition adjustment, RT4R Return of Title IV funds, WOFF bad debt write-off (adjustments).
 
 ### AccountTransaction (Banner TBRACCD)
 | Column | Type | Notes |
@@ -72,6 +73,12 @@ Codes: TUIT, FEES, CLIN, MATL (charges); PELL, DLSU, DLUN, GPLS, VA33, VA31, MLT
 | PlanAmount, Installments | | |
 | Status | varchar(10) | ACTIVE, COMPLETED, CANCELLED |
 
+### PaymentPlanInstallment
+| Column | Type | Notes |
+|---|---|---|
+| VendorPlanId, InstallmentNo | | PK |
+| DueDate, Amount | | The plan's schedule. Aging uses these due dates for students on an active or completed plan |
+
 ### ReconBatch / ReconException
 One batch row per uploaded file; one exception row per finding. `ReconException.LineNumber` is NULL for ledger-side findings (NotInVendorFile). Status OPEN or RESOLVED with ResolvedBy, ResolvedAt, ResolutionNote.
 
@@ -83,6 +90,9 @@ Append-only. Actor, Action, EntityType, EntityId, Details, EventTime (UTC). App 
 ### dbo.fn_StudentTermBalance(@AsOfDate)
 Inline table-valued function, one row per student-term with activity on or before @AsOfDate. Returns charges, payments, aid, adjustments, balance, FIFO aging buckets (NotYetDue, Due1To30, Due31To60, Due61To90, Due90Plus), PastDueAmount, DaysPastDue (oldest unpaid past-due charge), AgingBucket, VA and payment plan status. Every report and the dashboard read from this.
 
+### dbo.fn_RevenueRecognized(@FromDate, @ToDate, @AsOfDate)
+Revenue earned in a date range from what had been billed by @AsOfDate, per institution and term. Tuition and fees are recognised evenly over the days of the term; institutional scholarships and withdrawal credits reduce revenue. Deferred revenue on a date = this function from the next day onward.
+
 ### Stored procedures
 | Proc | Used by |
 |---|---|
@@ -90,7 +100,9 @@ Inline table-valued function, one row per student-term with activity on or befor
 | usp_DashboardKpis | Dashboard tiles |
 | usp_PaymentTrendByMonth | Dashboard trend chart |
 | usp_CollectionRateByTerm | Dashboard table |
-| usp_PastDueByInstitution | Dashboard aging chart |
+| usp_FinancialSummary | Dashboard revenue/collections row (prior FY, prior-year-to-date, year-to-date, deferred revenue, trailing 12-month revenue) |
+| usp_FinancialsByInstitution | Dashboard by-institution table and aging chart |
+| usp_MonthReceipts, usp_MonthReceiptComparisons | Month drill-down page |
 | usp_GetLedgerVendorPayments | Reconciliation |
 
 ## rpt views (Ask for a Report)
